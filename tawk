@@ -1,0 +1,319 @@
+#!/usr/bin/env tclsh
+# -*- tcl -*-
+
+# Copyright 2020 Shawn Wagner <shawnw.mobile@gmail.com>
+
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+# LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+package require Tcl 8.6
+package require dicttool
+package require textutil::split
+package require cmdline
+
+namespace path ::textutil::split
+
+set commands [dict create]
+
+proc setup_interp {i} {
+    interp alias $i BEGIN {} BEGIN
+    interp alias $i END {} END
+    interp alias $i BEGINFILE {} BEGINFILE
+    interp alias $i ENDFILE {} ENDFILE
+    interp alias $i line {} line
+    interp alias $i rline {} rline
+    interp eval $i [list namespace eval internal {
+        proc build_f0 {} {
+            set new_f0 [lmap i [lrange [lsort -integer [array names ::F]] 1 end] {
+                concat $::F($i)
+            }]
+            return [join $new_f0 $::OFS]
+        }
+        proc trace_ofs {_ _ _} {
+            if {[array exists ::F]} {
+                trace remove variable ::F write ::internal::trace_f
+                set ::F(0) [build_f0]
+                trace add variable ::F write ::internal::trace_f
+            }
+        }
+        proc trace_f {_ key _} {
+            if {![string is integer $key] || $key <= 0} {
+                error "Attempt to use out-of-range field index."
+            }
+            set len [expr {[array size ::F] - 1}]
+            trace remove variable ::F write ::internal::trace_f
+            if {$key > $len} {
+                for {set i [expr {$len + 1}]} {$i < $key} {incr i} {
+                    set ::F($i) ""
+                }
+                trace remove variable ::NF write ::internal::trace_nf
+                set ::NF $key
+                trace add variable ::NF write ::internal::trace_nf
+            }
+            set ::F(0) [build_f0]
+            trace add variable ::F write ::internal::trace_f
+        }
+        proc trace_nf {_ _ _} {
+            if {![string is integer $::NF] || $::NF <= 0} {
+                error "Attempt to set NF to an out of range value."
+            }
+            set len [expr {[array size ::F] - 1}]
+            trace remove variable ::F write ::internal::trace_f
+            if {$len < $::NF} {
+                for {set i $len} {$i <= $::NF} {incr i} {
+                    set ::F($i) ""
+                }
+            } elseif {$len > $::NF} {
+                for {set i $::NF} {$i > $len} {incr i -1} {
+                    unset ::F($i)
+                }
+            }
+            set ::F(0) [build_f0]
+            trace add variable ::F write ::internal::trace_f
+        }
+        
+        proc trace_fs {_ _ _} {
+            set ::FS ""
+            trace add variable ::FS unset ::internal::trace_fs
+        }
+        
+        namespace export trace_*
+    }]
+}
+
+# Open file and call body for each line read from it.
+proc foreach_line {var filename body} {
+    upvar $var line
+    if {$filename eq "-"} {
+        set f stdin
+    } else {
+        set f [open $filename r]
+    }
+    while {[gets $f line] >= 0} {
+        switch [catch { uplevel 1 $body } status] {
+            1 { close $f; return -code error -level 2 $status }
+            2 { close $f; return -level 2 $status }
+            3 { break }
+            default {}
+        }
+    }
+    if {$filename ne "-"} {
+        close $f
+    }
+}
+
+proc foreach_idx {var idx lst bdy} {
+    upvar $var v $idx i
+    set i 0
+    foreach v $lst {
+        try {
+            uplevel 1 $bdy
+        } on error {_ status} {
+            return -code error -level 2 $status
+        } on return {_ status} {
+            return -level 2 $status
+        } on break {} {
+            break
+        } finally {
+            incr i
+        }
+    }
+}
+
+proc numberlist {lst} {
+    set result {}
+    foreach_idx f i $lst {
+        lappend result [expr {$i + 1}] $f
+    }
+    return $result
+}
+
+proc process_file {i file} {
+    variable commands
+    
+    interp eval $i [list set ::FILENAME $file]
+    interp eval $i {set ::FNR 0}
+    foreach script [dict getnull $commands BEGINFILE] {
+        interp eval $i [list uplevel #0 $script]
+    }
+    foreach_line line $file {
+        interp eval $i {incr ::FNR}
+        interp eval $i {incr ::NR}
+        interp eval $i {array unset ::F}
+        interp eval $i {unset ::NF}
+        set fs [interp eval $i {set ::FS}]
+        if {$fs eq ""} {
+            set fields [splitx $line]
+        } else {
+            set fields [splitx $line $fs]
+        }
+        interp eval $i [list set ::NF [llength $fields]]
+        interp eval $i [list set ::F(0) $line]
+        interp eval $i [list array set ::F [numberlist $fields]]
+        interp eval $i [list trace add variable ::NF write ::internal::trace_nf]
+        interp eval $i [list trace add variable ::F write ::internal::trace_f]
+        foreach pattern [dict getnull $commands patterns] {
+            switch [lindex $pattern 0] {
+                expr {
+                      if {[interp eval $i \
+                               [list uplevel #0 \
+                                    [list expr [lindex $pattern 1]]]]} {
+                          interp eval $i \
+                              [list uplevel #0 {*}[lindex $pattern 2]]
+                      }
+                  }
+                re {
+                    if {[regexp [lindex $pattern 2] \
+                             $::F([lindex $pattern 1])]} {
+                        interp eval $i \
+                            [list uplevel #0 {*}[lindex $pattern 3]]
+                    }
+                }
+            }
+        }
+    }
+    foreach script [dict getnull $commands ENDFILE] {
+        interp eval $i [list uplevel #0 $script]
+    }
+}
+
+proc tawk {i files} {
+    variable commands
+ 
+    set nfiles_processed 0
+    
+    interp eval $i {set ::NR 0}
+    interp eval $i {set ::OFS " "}
+    interp eval $i {trace add variable ::OFS write ::internal::trace_ofs}
+    interp eval $i {set ::NF 0}
+    
+    foreach script [dict getnull $commands BEGIN] {
+        interp eval $i [list uplevel #0 $script]
+    }
+    foreach file $files {
+        if {[regexp {^(\w+)=(.*)} $file -> varname varval]} {
+            interp eval $i [list set $varname $varval]
+            continue
+        }
+        incr nfiles_processed
+        process_file $i $file
+    }
+    # Read from standard input if no files given on command line
+    if {$nfiles_processed == 0} {
+        process_file $i -
+    }
+    foreach script [dict getnull $commands END] {
+        interp eval $i [list uplevel #0 $script]
+    }
+}
+
+proc BEGIN {body} {
+    variable commands
+    dict lappend commands BEGIN $body
+}
+
+proc END {body} {
+    variable commands
+    dict lappend commands END $body
+}
+
+proc BEGINFILE {body} {
+    variable commands
+    dict lappend commands BEGINFILE $body
+}
+
+proc ENDFILE {body} {
+    variable commands
+    dict lappend commands ENDFILE $body
+}
+
+proc line args {
+    variable commands
+    switch [llength $args] {
+        1 { dict lappend commands patterns [list expr 1 $args] }
+        2 { dict lappend commands patterns [list expr {*}$args] }
+        default { error "Invalid number of arguments to line command" }
+    }
+}
+
+proc rline args {
+    variable commands
+    set field 0
+    if {[llength $args] == 4} {
+        set args [lassign $args sw field]
+        if {$sw ne "-field"} {
+            error "Unknown flag $sw"
+        }
+    }
+    if {[llength $args] != 2} {
+        error "rline syntax error"
+    }
+    lassign $args re body
+    dict lappend commands patterns [list re $field $re $body]
+}
+
+proc main {argv} {
+    set options {
+        {f.arg "" "Filename to load instead of script given on the command line."}
+        {F.arg "" "Field separator (Regular expression)"}
+        {safe "Execute script in safe mode."}
+        {timeout.arg 0 "Error if script takes more than N seconds to run (0 for no timeout)." }
+    }
+    set usage {[OPTIONS] ['script'] [VAR=VALUE | FILENAME] ...}
+
+    try {
+        array set params [::cmdline::getoptions argv $options $usage]
+        if {[info exists params(safe)] && $params(safe)} {
+            set i [interp create -safe]
+        } else {
+            set i [interp create]
+        }
+        if {$params(timeout) > 0} {
+            interp limit $i time -seconds [expr {[clock seconds] + $params(timeout)}]
+        }
+        setup_interp $i
+        interp eval $i [list set ::FS $params(F)]
+        interp eval $i {trace add variable ::FS unset ::internal::trace_fs}
+        interp transfer "" stdout $i
+        if {$params(f) ne ""} {
+            if {[interp issafe $i]} {
+                interp invokehidden $i source $params(f)
+            } else {
+                interp eval $i [list source $params(f)]
+            }
+            set files $argv
+        } else {
+            if {[llength $argv] == 0} {
+                error "Missing script argument."
+            }
+            set files [lassign $argv script]
+            interp eval $i $script
+        }
+        tawk $i $files
+        interp delete $i
+    } trap {CMDLINE USAGE} {msg _} {
+        puts stderr $msg
+        exit 0
+    } on error {msg} {
+        puts stderr "Error: $msg"
+        exit 1
+    }
+}
+
+main $argv
