@@ -183,6 +183,20 @@ else
     fail+=1
 fi
 
+# Fields with spaces
+cat <<EOF >data.txt
+red fox,1
+brown dog,2
+grey cat,3
+EOF
+if ./tawk -F , 'line { puts "[string toupper $F(1)]"}' data.txt > /dev/null; then
+    echo "Test 17: Pass"
+    pass+=1
+else
+    echo "Test 17:  Fail"
+    fail+=1
+fi
+
 
 echo "Done."
 echo "$pass tests passed, $fail tests failed."

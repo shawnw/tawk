@@ -32,12 +32,17 @@ namespace path ::textutil::split
 set commands [dict create]
 
 proc setup_interp {i} {
+    interp share "" stdin $i
+    interp share "" stderr $i
+    interp share "" stdout $i
+
     interp alias $i BEGIN {} BEGIN
     interp alias $i END {} END
     interp alias $i BEGINFILE {} BEGINFILE
     interp alias $i ENDFILE {} ENDFILE
     interp alias $i line {} line
     interp alias $i rline {} rline
+
     interp eval $i [list namespace eval internal {
         proc build_f0 {} {
             set new_f0 [lmap i [lrange [lsort -integer [array names ::F]] 1 end] {
@@ -147,42 +152,38 @@ proc numberlist {lst} {
 proc process_file {i file} {
     variable commands
     
-    interp eval $i [list set ::FILENAME $file]
-    interp eval $i {set ::FNR 0}
+    interp eval $i set ::FILENAME "$file"
+    interp eval $i set ::FNR 0
     foreach script [dict getnull $commands BEGINFILE] {
         interp eval $i [list uplevel #0 $script]
     }
     foreach_line line $file {
-        interp eval $i {incr ::FNR}
-        interp eval $i {incr ::NR}
-        interp eval $i {array unset ::F}
-        interp eval $i {unset ::NF}
-        set fs [interp eval $i {set ::FS}]
+        interp eval $i incr ::FNR
+        interp eval $i incr ::NR
+        interp eval $i array unset ::F
+        interp eval $i unset ::NF
+        set fs [interp eval $i set ::FS]
         if {$fs eq ""} {
             set fields [splitx $line]
         } else {
             set fields [splitx $line $fs]
         }
-        interp eval $i [list set ::NF [llength $fields]]
+        interp eval $i set ::NF [llength $fields]
         interp eval $i [list set ::F(0) $line]
         interp eval $i [list array set ::F [numberlist $fields]]
-        interp eval $i [list trace add variable ::NF write ::internal::trace_nf]
-        interp eval $i [list trace add variable ::F write ::internal::trace_f]
+        interp eval $i trace add variable ::NF write ::internal::trace_nf
+        interp eval $i trace add variable ::F write ::internal::trace_f
         foreach pattern [dict getnull $commands patterns] {
             switch [lindex $pattern 0] {
                 expr {
-                      if {[interp eval $i \
-                               [list uplevel #0 \
-                                    [list expr [lindex $pattern 1]]]]} {
-                          interp eval $i \
-                              [list uplevel #0 {*}[lindex $pattern 2]]
+                      if {[interp eval $i [list uplevel #0 expr [lindex $pattern 1]]]} {
+                          interp eval $i [list uplevel #0 {*}[lindex $pattern 2]]
                       }
                   }
                 re {
                     if {[regexp [lindex $pattern 2] \
                              $::F([lindex $pattern 1])]} {
-                        interp eval $i \
-                            [list uplevel #0 {*}[lindex $pattern 3]]
+                        interp eval $i [list uplevel #0 {*}[lindex $pattern 3]]
                     }
                 }
             }
@@ -198,10 +199,10 @@ proc tawk {i files} {
  
     set nfiles_processed 0
     
-    interp eval $i {set ::NR 0}
+    interp eval $i set ::NR 0
     interp eval $i {set ::OFS " "}
-    interp eval $i {trace add variable ::OFS write ::internal::trace_ofs}
-    interp eval $i {set ::NF 0}
+    interp eval $i trace add variable ::OFS write ::internal::trace_ofs
+    interp eval $i set ::NF 0
     
     foreach script [dict getnull $commands BEGIN] {
         interp eval $i [list uplevel #0 $script]
@@ -289,11 +290,10 @@ proc main {argv} {
         }
         setup_interp $i
         interp eval $i [list set ::FS $params(F)]
-        interp eval $i {trace add variable ::FS unset ::internal::trace_fs}
-        interp transfer "" stdout $i
+        interp eval $i trace add variable ::FS unset ::internal::trace_fs
         if {$params(f) ne ""} {
             if {[interp issafe $i]} {
-                interp invokehidden $i source $params(f)
+                interp invokehidden $i [list source $params(f)]
             } else {
                 interp eval $i [list source $params(f)]
             }
