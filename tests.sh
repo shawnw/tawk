@@ -197,6 +197,7 @@ else
     fail+=1
 fi
 
+# Test print
 cat <<EOF >out2.txt
 1,red fox
 2,brown dog
@@ -210,7 +211,44 @@ else
     echo "Test 18:  Fail"
     fail+=1
 fi
+
+# Test csv_join
+if ./tawk -F , 'line { puts [csv_join [list $F(2) $F(1)]] }' data.txt > out.txt \
+        && cmp out.txt out2.txt; then
+    echo "Test 19: Pass"
+    pass+=1
+else
+    echo "Test 19:  Fail"
+    fail+=1
+fi
     
+# Test unsetting a read-only variable
+if ! ./tawk 'BEGIN { unset OFS }' data.txt; then
+    echo "Test 20: Pass"
+    pass+=1
+else
+    echo "Test 20:  Fail"
+    fail+=1
+fi
+
+# Test setting a read-only variable
+if ! ./tawk 'BEGIN { set CSV 1 }' data.txt > /dev/null 2>&1; then
+    echo "Test 21: Pass"
+    pass+=1
+else
+    echo "Test 21:  Fail"
+    fail+=1
+fi
+
+# Test csv mode print
+if ./tawk -csv 'line { print $F(2) $F(1) }' data.txt > out.txt \
+        && cmp out.txt out2.txt; then
+    echo "Test 22: Pass"
+    pass+=1
+else
+    echo "Test 22:  Fail"
+    fail+=1
+fi
 
 echo "Done."
 echo "$pass tests passed, $fail tests failed."

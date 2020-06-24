@@ -7,7 +7,6 @@ powerful enough, I turn to `perl`. But... choice is good. Enter
 `tawk`, which uses `tcl` as the scripting language. It's designed to
 be very familiar to anyone coming from an `awk` background.
 
-
 Running `tawk`
 ==============
 
@@ -23,16 +22,16 @@ Installing
 Dependencies are tcl 8.6, and tcllib. Copy the `tawk` script to
 `/usr/local/bin` or wherever - it's a single, self-contained script.
 
-
 Options
 -------
 
-* `-F regexp` Sets the field seperator regular expression.
+* `-F regexp` Sets the field seperator (`FS`).
 * `-f filename` Read the script from the given file instead of it
   being the first non-option command line argument.
 * `-safe` Run the script in a safe tcl interpreter. Meant for untrusted code.
 * `-timeout N` Exit with an error if a script takes more than `N`
   seconds to complete.
+* `-csv` Turn on CSV line parsing. Prefer this over setting `FS` to a comma.
 
 The language
 ============
@@ -56,6 +55,8 @@ Commands
 
 ### These are available everywhere
 * `print arg ...` Print out all its arguments joined by `$OFS`.
+* `csv_join arglist [delim]` Return the list joined into a CSV-formatted string.
+* `csv_split string [delim]` Split a CSV-formatted string into a list.
 
 Variables
 ---------
@@ -67,7 +68,18 @@ Most of these are lifted straight from `awk` names.
 * `NR` The current line number.
 * `FNR` The line number of the current file.
 * `FILENAME` The name of the current file, `-` for standard input.
-* `FS` If set, a regular expression that is used to indicate field
-  delmiters. If an empty string or not set, any amount of whitespace is used.
+* `FS` If set, a single character, or regular expression that is used
+  to indicate field delmiters. If an empty string or not set, any
+  amount of whitespace is used.
 * `OFS` Used to separate fields in `F(0)` when other elements of `F`
   are written to or `NF` is changed.
+* `CSV` 1 if in CSV mode, 0 if in normal mode.
+
+CSV Mode
+--------
+
+If invoked with the `-csv` option, the default field separator is set
+to comma instead of whitespace, and lines are split by a CSV parser -
+so commas in quoted fields don't count, unlike if just setting `FS` to
+a comma. Also, the `print` command CSV-escapes its arguments, and
+`gets` reads a full CSV record, which may be multiple lines.

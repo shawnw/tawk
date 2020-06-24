@@ -26,8 +26,7 @@ package require Tcl 8.6
 package require dicttool
 package require textutil::split
 package require cmdline
-
-namespace path ::textutil::split
+package require csv
 
 set commands [dict create]
 
@@ -42,21 +41,28 @@ proc setup_interp {i} {
     interp alias $i ENDFILE {} ENDFILE
     interp alias $i line {} line
     interp alias $i rline {} rline
+    interp alias $i csv_join {} ::csv::join
+    interp alias $i csv_split {} ::csv::split
 
-    interp eval $i [list namespace eval internal {
+    interp eval $i {namespace eval internal {
         proc build_f0 {} {
             set new_f0 [lmap i [lrange [lsort -integer [array names ::F]] 1 end] {
                 concat $::F($i)
             }]
             return [join $new_f0 $::OFS]
         }
-        proc trace_ofs {_ _ _} {
+
+        proc trace_ofs {_ _ op} {
+            if {$op eq "unset"} {
+                error "Unable to unset OFS"
+            }
             if {[array exists ::F]} {
                 trace remove variable ::F write ::internal::trace_f
                 set ::F(0) [build_f0]
                 trace add variable ::F write ::internal::trace_f
             }
         }
+
         proc trace_f {_ key _} {
             if {![string is integer $key] || $key <= 0} {
                 error "Attempt to use out-of-range field index."
@@ -97,15 +103,17 @@ proc setup_interp {i} {
             set ::FS ""
             trace add variable ::FS unset ::internal::trace_fs
         }
+
+        proc trace_raise_error {var _ op} {
+            error "Unable to $op protected variable $var"
+        }
         
         namespace export trace_*
-    }]
-    interp eval $i [list proc print args {
-        puts [join $args $::OFS]
-    }]
+    }}
 }
 
 proc cleanup_interp {i} {
+    # Remove toplevel aliases after parsing script
     interp alias $i BEGIN {}
     interp alias $i END {}
     interp alias $i BEGINFILE {} 
@@ -115,14 +123,14 @@ proc cleanup_interp {i} {
 }
 
 # Open file and call body for each line read from it.
-proc foreach_line {var filename body} {
+proc foreach_line {var filename gets body} {
     upvar $var line
     if {$filename eq "-"} {
         set f stdin
     } else {
         set f [open $filename r]
     }
-    while {[gets $f line] >= 0} {
+    while {[$gets $f line] >= 0} {
         switch [catch { uplevel 1 $body } status] {
             1 { close $f; return -code error -level 2 $status }
             2 { close $f; return -level 2 $status }
@@ -161,30 +169,58 @@ proc numberlist {lst} {
     return $result
 }
 
-proc process_file {i file} {
+proc split_re {line fs} {
+    if {$fs eq ""} {
+        return [::textutil::split::splitx $line]
+    } elseif {[string length $fs] == 1} {
+        return [split $line $fs]
+    } else {
+        return [::textutil::split::splitx $line $fs]
+    }
+}
+
+proc gets_csv {file linevar} {
+    upvar $linevar line
+    set line ""
+    set totlen 0
+    while {[set len [gets $file tmp]] >= 0} {
+        incr totlen $len
+        set line [string cat $line $tmp]
+        if {[::csv::iscomplete $line]} {
+            return $totlen
+        }
+    }
+    return $len
+}
+
+proc split_csv {line fs} {
+    if {$fs eq ""} {
+        return [::csv::split $line]
+    } else {
+        return [::csv::split $line $fs]
+    }
+}
+
+proc process_file {i file gets splitter} {
     variable commands
     
-    interp eval $i set ::FILENAME "$file"
-    interp eval $i set ::FNR 0
+    interp eval $i [list set ::FILENAME $file]
+    interp eval $i {set ::FNR 0}
     foreach script [dict getnull $commands BEGINFILE] {
         interp eval $i [list uplevel #0 $script]
     }
-    foreach_line line $file {
-        interp eval $i incr ::FNR
-        interp eval $i incr ::NR
-        interp eval $i array unset ::F
-        interp eval $i unset ::NF
-        set fs [interp eval $i set ::FS]
-        if {$fs eq ""} {
-            set fields [splitx $line]
-        } else {
-            set fields [splitx $line $fs]
-        }
-        interp eval $i set ::NF [llength $fields]
+    foreach_line line $file $gets {
+        interp eval $i {incr ::FNR}
+        interp eval $i {incr ::NR}
+        interp eval $i {array unset ::F}
+        interp eval $i {unset ::NF}
+        set fs [interp eval $i {set ::FS}]
+        set fields [$splitter $line $fs]
+        interp eval $i [list set ::NF [llength $fields]]
         interp eval $i [list set ::F(0) $line]
         interp eval $i [list array set ::F [numberlist $fields]]
-        interp eval $i trace add variable ::NF write ::internal::trace_nf
-        interp eval $i trace add variable ::F write ::internal::trace_f
+        interp eval $i {trace add variable ::NF write ::internal::trace_nf}
+        interp eval $i {trace add variable ::F write ::internal::trace_f}
         foreach pattern [dict getnull $commands patterns] {
             switch [lindex $pattern 0] {
                 expr {
@@ -206,15 +242,15 @@ proc process_file {i file} {
     }
 }
 
-proc tawk {i files} {
+proc tawk {i files gets splitter} {
     variable commands
  
     set nfiles_processed 0
     
-    interp eval $i set ::NR 0
-    interp eval $i {set ::OFS " "}
-    interp eval $i trace add variable ::OFS write ::internal::trace_ofs
-    interp eval $i set ::NF 0
+    interp eval $i {trace add variable ::OFS {write unset} ::internal::trace_ofs}
+    interp eval $i {trace add variable ::CSV {write unset} ::internal::trace_raise_error}
+    interp eval $i {set ::NR 0}
+    interp eval $i {set ::NF 0}
     
     foreach script [dict getnull $commands BEGIN] {
         interp eval $i [list uplevel #0 $script]
@@ -225,11 +261,11 @@ proc tawk {i files} {
             continue
         }
         incr nfiles_processed
-        process_file $i $file
+        process_file $i $file $gets $splitter
     }
     # Read from standard input if no files given on command line
     if {$nfiles_processed == 0} {
-        process_file $i -
+        process_file $i - $gets $splitter
     }
     foreach script [dict getnull $commands END] {
         interp eval $i [list uplevel #0 $script]
@@ -285,6 +321,7 @@ proc main {argv} {
     set options {
         {f.arg "" "Filename to load instead of script given on the command line."}
         {F.arg "" "Field separator (Regular expression)"}
+        {csv "Input is CSV data."}
         {safe "Execute script in safe mode."}
         {timeout.arg 0 "Error if script takes more than N seconds to run (0 for no timeout)." }
     }
@@ -302,7 +339,7 @@ proc main {argv} {
         }
         setup_interp $i
         interp eval $i [list set ::FS $params(F)]
-        interp eval $i trace add variable ::FS unset ::internal::trace_fs
+        interp eval $i {trace add variable ::FS unset ::internal::trace_fs}
         if {$params(f) ne ""} {
             if {[interp issafe $i]} {
                 interp invokehidden $i [list source $params(f)]
@@ -318,7 +355,28 @@ proc main {argv} {
             interp eval $i $script
         }
         cleanup_interp $i
-        tawk $i $files
+        if {[info exists params(csv)] && $params(csv)} {
+            set csv_mode true
+            set gets_cmd gets_csv
+            set splitter_cmd split_csv
+            interp eval $i {set ::CSV 1}
+            interp eval $i {set ::OFS ","}
+            interp eval $i {proc print args {
+                puts [csv_join $args $::OFS]
+            }}
+            interp hide $i gets
+            interp alias $i gets {} gets_csv
+        } else {
+            set csv_mode false
+            set gets_cmd gets
+            set splitter_cmd split_re
+            interp eval $i {set ::CSV 0}
+            interp eval $i {set ::OFS " "}
+            interp eval $i {proc print args {
+                puts [join $args $::OFS]
+            }}
+        }
+        tawk $i $files $gets_cmd $splitter_cmd
         interp delete $i
     } trap {CMDLINE USAGE} {msg _} {
         puts stderr $msg
