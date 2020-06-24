@@ -197,6 +197,20 @@ else
     fail+=1
 fi
 
+cat <<EOF >out2.txt
+1,red fox
+2,brown dog
+3,grey cat
+EOF
+if ./tawk -F , 'line { print $F(2) $F(1) }' OFS=, data.txt > out.txt \
+        && cmp out.txt out2.txt; then
+    echo "Test 18: Pass"
+    pass+=1
+else
+    echo "Test 18:  Fail"
+    fail+=1
+fi
+    
 
 echo "Done."
 echo "$pass tests passed, $fail tests failed."

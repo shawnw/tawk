@@ -42,6 +42,8 @@ Commands
 
 `tawk` adds the following commands on top of basic `tcl`:
 
+### These are available as top-level commands.
+
 * `BEGIN script` Executed at the beginning of processing, before any data.
 * `END script` Executed at the end, after processing all data.
 * `BEGINFILE script` Executed at the beginning of each file.
@@ -51,6 +53,9 @@ Commands
   executes the script.
 * `rline re script` If the regular expression `re` matches the line,
   executes the script.
+
+### These are available everywhere
+* `print arg ...` Print out all its arguments joined by `$OFS`.
 
 Variables
 ---------

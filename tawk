@@ -100,6 +100,18 @@ proc setup_interp {i} {
         
         namespace export trace_*
     }]
+    interp eval $i [list proc print args {
+        puts [join $args $::OFS]
+    }]
+}
+
+proc cleanup_interp {i} {
+    interp alias $i BEGIN {}
+    interp alias $i END {}
+    interp alias $i BEGINFILE {} 
+    interp alias $i ENDFILE {}
+    interp alias $i line {}
+    interp alias $i rline {}
 }
 
 # Open file and call body for each line read from it.
@@ -305,6 +317,7 @@ proc main {argv} {
             set files [lassign $argv script]
             interp eval $i $script
         }
+        cleanup_interp $i
         tawk $i $files
         interp delete $i
     } trap {CMDLINE USAGE} {msg _} {
