@@ -47,7 +47,7 @@ proc setup_interp {i} {
     interp eval $i {namespace eval internal {
         proc build_f0 {} {
             set new_f0 [lmap i [lrange [lsort -integer [array names ::F]] 1 end] {
-                concat $::F($i)
+                set ::F($i)
             }]
             return [join $new_f0 $::OFS]
         }
@@ -131,11 +131,16 @@ proc foreach_line {var filename gets body} {
         set f [open $filename r]
     }
     while {[$gets $f line] >= 0} {
-        switch [catch { uplevel 1 $body } status] {
-            1 { close $f; return -code error -level 2 $status }
-            2 { close $f; return -level 2 $status }
-            3 { break }
-            default {}
+        try {
+            uplevel 1 $body
+        } on error {msg opts} {
+            if {$filename ne "-"} { close $f }
+            return -level 2 -options $opts
+        } on return {msg opts} {
+            if {$filename ne "-"} { close $f }
+            return -level 2 -options $opts
+        } on break {_ _} {
+            break
         }
     }
     if {$filename ne "-"} {
@@ -185,7 +190,11 @@ proc gets_csv {file linevar} {
     set totlen 0
     while {[set len [gets $file tmp]] >= 0} {
         incr totlen $len
-        set line [string cat $line $tmp]
+        if {$line ne ""} {
+            set line [string cat $line "\n" $tmp]
+        } else {
+            set line $tmp
+        }
         if {[::csv::iscomplete $line]} {
             return $totlen
         }
@@ -203,7 +212,7 @@ proc split_csv {line fs} {
 
 proc process_file {i file gets splitter} {
     variable commands
-    
+
     interp eval $i [list set ::FILENAME $file]
     interp eval $i {set ::FNR 0}
     foreach script [dict getnull $commands BEGINFILE] {
@@ -362,7 +371,11 @@ proc main {argv} {
             interp eval $i {set ::CSV 1}
             interp eval $i {set ::OFS ","}
             interp eval $i {proc print args {
-                puts [csv_join $args $::OFS]
+                if {[llength $args] == 0} {
+                    puts $F(0)
+                } else {
+                    puts [csv_join $args $::OFS]
+                }
             }}
             interp hide $i gets
             interp alias $i gets {} gets_csv
@@ -373,7 +386,11 @@ proc main {argv} {
             interp eval $i {set ::CSV 0}
             interp eval $i {set ::OFS " "}
             interp eval $i {proc print args {
-                puts [join $args $::OFS]
+                if {[llength $args] == 0} {
+                    puts $F(0)
+                } else {
+                    puts [join $args $::OFS]
+                }
             }}
         }
         tawk $i $files $gets_cmd $splitter_cmd

@@ -54,7 +54,8 @@ Commands
   executes the script.
 
 ### These are available everywhere
-* `print arg ...` Print out all its arguments joined by `$OFS`.
+* `print [arg ...]` Print out all its arguments joined by `$OFS`, or
+  `$F(0)` if called with no arguments.
 * `csv_join arglist [delim]` Return the list joined into a CSV-formatted string.
 * `csv_split string [delim]` Split a CSV-formatted string into a list.
 
@@ -69,7 +70,7 @@ Most of these are lifted straight from `awk` names.
 * `FNR` The line number of the current file.
 * `FILENAME` The name of the current file, `-` for standard input.
 * `FS` If set, a single character, or regular expression that is used
-  to indicate field delmiters. If an empty string or not set, any
+  to indicate field delimiters. If an empty string or not set, any
   amount of whitespace is used.
 * `OFS` Used to separate fields in `F(0)` when other elements of `F`
   are written to or `NF` is changed.
@@ -78,8 +79,9 @@ Most of these are lifted straight from `awk` names.
 CSV Mode
 --------
 
-If invoked with the `-csv` option, the default field separator is set
-to comma instead of whitespace, and lines are split by a CSV parser -
-so commas in quoted fields don't count, unlike if just setting `FS` to
-a comma. Also, the `print` command CSV-escapes its arguments, and
-`gets` reads a full CSV record, which may be multiple lines.
+If invoked with the `-csv` option, the default field separator (`FS`)
+and output field separator (`OFS`) are set to comma instead of
+whitespace, and lines are split by a CSV parser - so commas in quoted
+fields don't count, unlike if just setting `FS` to a comma. Also, the
+`print` command CSV-escapes its arguments, and `gets` reads a full CSV
+record, which may be multiple lines.
