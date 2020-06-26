@@ -193,7 +193,7 @@ if ./tawk -F , 'line { puts "[string toupper $F(1)]"}' data.txt > /dev/null; the
     echo "Test 17: Pass"
     pass+=1
 else
-    echo "Test 17:  Fail"
+    echo "Test 17: Fail"
     fail+=1
 fi
 
@@ -208,7 +208,7 @@ if ./tawk -F , 'line { print $F(2) $F(1) }' OFS=, data.txt > out.txt \
     echo "Test 18: Pass"
     pass+=1
 else
-    echo "Test 18:  Fail"
+    echo "Test 18: Fail"
     fail+=1
 fi
 
@@ -218,16 +218,17 @@ if ./tawk -F , 'line { puts [csv_join [list $F(2) $F(1)]] }' data.txt > out.txt 
     echo "Test 19: Pass"
     pass+=1
 else
-    echo "Test 19:  Fail"
+    echo "Test 19: Fail"
     fail+=1
 fi
     
 # Test unsetting a read-only variable
+# TODO: Figure out why this is failing
 if ! ./tawk 'BEGIN { unset OFS }' data.txt; then
     echo "Test 20: Pass"
     pass+=1
 else
-    echo "Test 20:  Fail"
+    echo "Test 20: Fail"
     fail+=1
 fi
 
@@ -236,7 +237,7 @@ if ! ./tawk 'BEGIN { set CSV 1 }' data.txt > /dev/null 2>&1; then
     echo "Test 21: Pass"
     pass+=1
 else
-    echo "Test 21:  Fail"
+    echo "Test 21: Fail"
     fail+=1
 fi
 
@@ -246,7 +247,50 @@ if ./tawk -csv 'line { print $F(2) $F(1) }' data.txt > out.txt \
     echo "Test 22: Pass"
     pass+=1
 else
-    echo "Test 22:  Fail"
+    echo "Test 22: Fail"
+    fail+=1
+fi
+
+# Test continue, which should skip the rest of the current line
+if output=$(./tawk -F , '
+   line {
+        if {$NR > 1} { continue }
+        set total $F(2)
+   }
+   line { incr total $F(2) }
+   END { puts $total }' data.txt) && [[ $output -eq 2 ]]; then
+    echo "Test 23: Pass"
+    pass+=1
+else
+    echo "Test 23: Fail $output"
+    fail+=1
+fi
+
+# Test break, which should skip the remainder of the current file
+if output=$(./tawk -csv '
+   BEGIN { set total 0 }
+   line {
+        if {$NR == 1} { break }
+        incr total $F(2)
+   }
+   line { incr total $F(2) }
+   END { puts $total }' data.txt data.txt) && [[ $output -eq 12 ]]; then
+    echo "Test 24: Pass"
+    pass+=1
+else
+    echo "Test 24: Fail"
+    fail+=1
+fi
+
+# Test error, which should abort the script
+if ! output=$(./tawk '
+   BEGIN { error Test }
+   line { puts Fail }' data.txt 2>&1) \
+   && [[ $output == "Error: Test" ]]; then
+    echo "Test 25: Pass"
+    pass+=1
+else
+    echo "Test 25: Fail"
     fail+=1
 fi
 

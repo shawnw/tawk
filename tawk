@@ -135,11 +135,11 @@ proc foreach_line {var filename gets body} {
             uplevel 1 $body
         } on error {msg opts} {
             if {$filename ne "-"} { close $f }
-            return -level 2 -options $opts
+            return -options $opts -level 2 $msg
         } on return {msg opts} {
             if {$filename ne "-"} { close $f }
-            return -level 2 -options $opts
-        } on break {_ _} {
+            return -options $opts -level 2
+        } on break {} {
             break
         }
     }
@@ -154,10 +154,10 @@ proc foreach_idx {var idx lst bdy} {
     foreach v $lst {
         try {
             uplevel 1 $bdy
-        } on error {_ status} {
-            return -code error -level 2 $status
-        } on return {_ status} {
-            return -level 2 $status
+        } on error {msg opts} {
+            return -options $opts -level 2 $msg
+        } on return {msg opts} {
+            return -options $opts -level 2 $msg
         } on break {} {
             break
         } finally {
@@ -218,34 +218,47 @@ proc process_file {i file gets splitter} {
     foreach script [dict getnull $commands BEGINFILE] {
         interp eval $i [list uplevel #0 $script]
     }
-    foreach_line line $file $gets {
-        interp eval $i {incr ::FNR}
-        interp eval $i {incr ::NR}
-        interp eval $i {array unset ::F}
-        interp eval $i {unset ::NF}
-        set fs [interp eval $i {set ::FS}]
-        set fields [$splitter $line $fs]
-        interp eval $i [list set ::NF [llength $fields]]
-        interp eval $i [list set ::F(0) $line]
-        interp eval $i [list array set ::F [numberlist $fields]]
-        interp eval $i {trace add variable ::NF write ::internal::trace_nf}
-        interp eval $i {trace add variable ::F write ::internal::trace_f}
-        foreach pattern [dict getnull $commands patterns] {
-            switch [lindex $pattern 0] {
-                expr {
-                      if {[interp eval $i [list uplevel #0 expr [lindex $pattern 1]]]} {
-                          interp eval $i [list uplevel #0 {*}[lindex $pattern 2]]
-                      }
-                  }
-                re {
-                    if {[regexp [lindex $pattern 2] \
-                             $::F([lindex $pattern 1])]} {
-                        interp eval $i [list uplevel #0 {*}[lindex $pattern 3]]
+    try {
+        foreach_line line $file $gets {
+            interp eval $i {incr ::FNR}
+            interp eval $i {incr ::NR}
+            interp eval $i {array unset ::F}
+            interp eval $i {unset ::NF}
+            set fs [interp eval $i {set ::FS}]
+            set fields [$splitter $line $fs]
+            interp eval $i [list set ::NF [llength $fields]]
+            interp eval $i [list set ::F(0) $line]
+            interp eval $i [list array set ::F [numberlist $fields]]
+            interp eval $i {trace add variable ::NF write ::internal::trace_nf}
+            interp eval $i {trace add variable ::F write ::internal::trace_f}
+            foreach pattern [dict getnull $commands patterns] {
+                try {
+                    switch [lindex $pattern 0] {
+                        expr {
+                              if {[interp eval $i \
+                                       [list uplevel #0 expr [lindex $pattern 1]]]} {
+                                  interp eval $i [list uplevel #0 {*}[lindex $pattern 2]]
+                              }
+                          }
+                        re {
+                            if {[regexp [lindex $pattern 2] \
+                                     $::F([lindex $pattern 1])]} {
+                                interp eval $i [list uplevel #0 {*}[lindex $pattern 3]]
+                            }
+                        }
                     }
+                } on error {msg opts} {
+                    return -options $opts $msg
+                } on break {} {
+                    # Skip further processing of the current file
+                    return -level 0 -code 5
+                } on continue {} {
+                    # Skip further processing of the current line
+                    break
                 }
             }
         }
-    }
+    } on 5 {} { }
     foreach script [dict getnull $commands ENDFILE] {
         interp eval $i [list uplevel #0 $script]
     }

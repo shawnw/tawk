@@ -59,6 +59,11 @@ Commands
 * `csv_join arglist [delim]` Return the list joined into a CSV-formatted string.
 * `csv_split string [delim]` Split a CSV-formatted string into a list.
 
+### Changes to existing commands
+
+* `continue` stops processing the current line and goes to the next. Like `next` in awk.
+* `break` stops processing the current file and goes on to the next.
+
 Variables
 ---------
 
