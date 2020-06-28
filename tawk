@@ -45,11 +45,18 @@ proc setup_interp {i} {
     interp alias $i csv_split {} ::csv::split
 
     interp eval $i {namespace eval internal {
-        proc build_f0 {} {
+        proc build_f0_normal {} {
             set new_f0 [lmap i [lrange [lsort -integer [array names ::F]] 1 end] {
                 set ::F($i)
             }]
             return [join $new_f0 $::OFS]
+        }
+
+        proc build_f0_csv {} {
+            set new_f0 [lmap i [lrange [lsort -integer [array names ::F]] 1 end] {
+                set ::F($i)
+            }]
+            return [csv_join $new_f0 $::OFS]
         }
 
         proc trace_ofs {_ _ op} {
@@ -58,7 +65,11 @@ proc setup_interp {i} {
             }
             if {[array exists ::F]} {
                 trace remove variable ::F write ::internal::trace_f
-                set ::F(0) [build_f0]
+                if {$::CSV} {
+                    set ::F(0) [build_f0_csv]
+                } else {
+                    set ::F(0) [build_f0]
+                }
                 trace add variable ::F write ::internal::trace_f
             }
         }
@@ -77,9 +88,14 @@ proc setup_interp {i} {
                 set ::NF $key
                 trace add variable ::NF write ::internal::trace_nf
             }
-            set ::F(0) [build_f0]
+            if {$::CSV} {
+                set ::F(0) [build_f0_csv]
+            } else {
+                set ::F(0) [build_f0_normal]
+            }
             trace add variable ::F write ::internal::trace_f
         }
+
         proc trace_nf {_ _ _} {
             if {![string is integer $::NF] || $::NF <= 0} {
                 error "Attempt to set NF to an out of range value."
@@ -95,7 +111,11 @@ proc setup_interp {i} {
                     unset ::F($i)
                 }
             }
-            set ::F(0) [build_f0]
+            if {$::CSV} {
+                set ::F(0) [build_f0_csv]
+            } else {
+                set ::F(0) [build_f0_normal]
+            }
             trace add variable ::F write ::internal::trace_f
         }
         
