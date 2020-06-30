@@ -189,7 +189,7 @@ red fox,1
 brown dog,2
 grey cat,3
 EOF
-if ./tawk -F , 'line { puts "[string toupper $F(1)]"}' data.txt > /dev/null; then
+if ./tawk -F , 'line { puts "[string toupper $F(1)]" }' data.txt > /dev/null; then
     echo "Test 17: Pass"
     pass+=1
 else

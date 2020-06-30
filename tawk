@@ -249,21 +249,23 @@ proc process_file {i file gets splitter} {
             interp eval $i [list set ::NF [llength $fields]]
             interp eval $i [list set ::F(0) $line]
             interp eval $i [list array set ::F [numberlist $fields]]
+            set fields [linsert $fields 0 $line]
             interp eval $i {trace add variable ::NF write ::internal::trace_nf}
             interp eval $i {trace add variable ::F write ::internal::trace_f}
             foreach pattern [dict getnull $commands patterns] {
                 try {
                     switch [lindex $pattern 0] {
                         expr {
-                              if {[interp eval $i \
-                                       [list uplevel #0 expr [lindex $pattern 1]]]} {
-                                  interp eval $i [list uplevel #0 {*}[lindex $pattern 2]]
+                              lassign $pattern _ test script
+                              if {[interp eval $i uplevel #0 expr $test]} {
+                                  set script [lindex $pattern 2]
+                                  interp eval $i uplevel #0 $script
                               }
                           }
                         re {
-                            if {[regexp [lindex $pattern 2] \
-                                     $::F([lindex $pattern 1])]} {
-                                interp eval $i [list uplevel #0 {*}[lindex $pattern 3]]
+                            lassign $pattern _ field re script
+                            if {[regexp $re [lindex $fields $field]]} {
+                                interp eval $i uplevel #0 $script
                             }
                         }
                     }
