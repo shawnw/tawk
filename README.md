@@ -49,9 +49,9 @@ Commands
 * `ENDFILE script` Executed at the end of reading each file.
 * `line script` Executed for every line read.
 * `line test script` If `test` returns true when evaluated by `expr`,
-  executes the script.
-* `rline re script` If the regular expression `re` matches the line,
-  executes the script.
+  execute the script.
+* `rline [-field N] re script` If the regular expression `re` matches the line,
+  (Or the specified field), execute the script.
 
 ### These are available everywhere
 * `print [arg ...]` Print out all its arguments joined by `$OFS`, or

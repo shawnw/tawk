@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 set +o noclobber
-trap "rm -f data.txt data.csv test.tawk out*.txt" EXIT
+trap "rm -f data*.txt data*.csv test.tawk out*.txt" EXIT
 
 echo "Running tawk tests..."
 
@@ -184,12 +184,12 @@ else
 fi
 
 # Fields with spaces
-cat <<EOF >data.txt
+cat <<EOF >data2.txt
 red fox,1
 brown dog,2
 grey cat,3
 EOF
-if ./tawk -F , 'line { puts "[string toupper $F(1)]" }' data.txt > /dev/null; then
+if ./tawk -F , 'line { puts "[string toupper $F(1)]" }' data2.txt > /dev/null; then
     echo "Test 17: Pass"
     pass+=1
 else
@@ -203,7 +203,7 @@ cat <<EOF >out2.txt
 2,brown dog
 3,grey cat
 EOF
-if ./tawk -F , 'line { print $F(2) $F(1) }' OFS=, data.txt > out.txt \
+if ./tawk -F , 'line { print $F(2) $F(1) }' OFS=, data2.txt > out.txt \
         && cmp out.txt out2.txt; then
     echo "Test 18: Pass"
     pass+=1
@@ -213,7 +213,7 @@ else
 fi
 
 # Test csv_join
-if ./tawk -F , 'line { puts [csv_join [list $F(2) $F(1)]] }' data.txt > out.txt \
+if ./tawk -F , 'line { puts [csv_join [list $F(2) $F(1)]] }' data2.txt > out.txt \
         && cmp out.txt out2.txt; then
     echo "Test 19: Pass"
     pass+=1
@@ -224,7 +224,7 @@ fi
     
 # Test unsetting a read-only variable
 # TODO: Figure out why this is failing
-if ! ./tawk 'BEGIN { unset OFS }' data.txt; then
+if ! ./tawk 'BEGIN { unset OFS }' data2.txt; then
     echo "Test 20: Pass"
     pass+=1
 else
@@ -233,7 +233,7 @@ else
 fi
 
 # Test setting a read-only variable
-if ! ./tawk 'BEGIN { set CSV 1 }' data.txt > /dev/null 2>&1; then
+if ! ./tawk 'BEGIN { set CSV 1 }' data2.txt > /dev/null 2>&1; then
     echo "Test 21: Pass"
     pass+=1
 else
@@ -242,7 +242,7 @@ else
 fi
 
 # Test csv mode print
-if ./tawk -csv 'line { print $F(2) $F(1) }' data.txt > out.txt \
+if ./tawk -csv 'line { print $F(2) $F(1) }' data2.txt > out.txt \
         && cmp out.txt out2.txt; then
     echo "Test 22: Pass"
     pass+=1
@@ -258,7 +258,7 @@ if output=$(./tawk -F , '
         set total $F(2)
    }
    line { incr total $F(2) }
-   END { puts $total }' data.txt) && [[ $output -eq 2 ]]; then
+   END { puts $total }' data2.txt) && [[ $output -eq 2 ]]; then
     echo "Test 23: Pass"
     pass+=1
 else
@@ -274,7 +274,7 @@ if output=$(./tawk -csv '
         incr total $F(2)
    }
    line { incr total $F(2) }
-   END { puts $total }' data.txt data.txt) && [[ $output -eq 12 ]]; then
+   END { puts $total }' data2.txt data2.txt) && [[ $output -eq 12 ]]; then
     echo "Test 24: Pass"
     pass+=1
 else
@@ -285,12 +285,44 @@ fi
 # Test error, which should abort the script
 if ! output=$(./tawk '
    BEGIN { error Test }
-   line { puts Fail }' data.txt 2>&1) \
+   line { puts Fail }' data2.txt 2>&1) \
    && [[ $output == "Error: Test" ]]; then
     echo "Test 25: Pass"
     pass+=1
 else
     echo "Test 25: Fail"
+    fail+=1
+fi
+
+# Test regular expressions
+if output=$(./tawk '
+   rline {[bc]} { incr sum $F(2) }
+   END { puts $sum }' data.txt) && [[ $output -eq 5 ]]; then
+    echo "Test 26: Pass"
+    pass+=1
+else
+    echo "Test 26: Fail"
+    fail+=1
+fi
+
+if output=$(./tawk '
+   rline -field 1 {[bc]} { incr sum $F(2) }
+   END { puts $sum }' data.txt) && [[ $output -eq 5 ]]; then
+    echo "Test 27: Pass"
+    pass+=1
+else
+    echo "Test 27: Fail"
+    fail+=1
+fi
+
+if output=$(./tawk '
+   BEGIN { set sum 0 }
+   rline -field 2 {[bc]} { incr sum $F(2) }
+   END { puts $sum }' data.txt) && [[ $output -eq 0 ]]; then
+    echo "Test 27: Pass"
+    pass+=1
+else
+    echo "Test 27: Fail"
     fail+=1
 fi
 
