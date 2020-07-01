@@ -18,7 +18,9 @@ declare -i pass=0 fail=0
 
 # Read from file
 if output=$(./tawk '
-   line { incr total $F(2) }
+   line {
+        incr total $F(2)
+   }
    END { puts $total }' data.txt) && [[ $output -eq 10 ]]; then
     echo "Test 1: Pass"
     pass+=1
@@ -325,6 +327,43 @@ else
     echo "Test 27: Fail"
     fail+=1
 fi
+
+# Test invalid field numbers for rline
+if ! ./tawk 'rline -field foo {[ab]} { puts $::F(0) }' data.txt 2>/dev/null; then
+    echo "Test 28: Pass"
+    pass+=1
+else
+    echo "Test 28: Fail"
+    fail+=1
+fi
+
+if ! ./tawk 'rline -field -1 {[ab]} { puts $F(0) }' data.txt 2>/dev/null; then
+    echo "Test 29: Pass"
+    pass+=1
+else
+    echo "Test 29: Fail"
+    fail+=1
+fi
+
+# Out of range positive fields are an empty string.
+if output=$(./tawk 'rline -field 40 {[ab]} { puts $F(0) }' data.txt) \
+   && [[ $output = "" ]]; then
+    echo "Test 30: Pass"
+    pass+=1
+else
+    echo "Test 30: Fail"
+    fail+=1
+fi
+
+if output=$(./tawk 'rline -field 40 {^$} { puts $F(0) }' data.txt) \
+   && [[ $output != "" ]]; then
+    echo "Test 31: Pass"
+    pass+=1
+else
+    echo "Test 31: Fail"
+    fail+=1
+fi
+
 
 echo "Done."
 echo "$pass tests passed, $fail tests failed."

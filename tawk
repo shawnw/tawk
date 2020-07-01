@@ -236,7 +236,7 @@ proc process_file {i file gets splitter} {
     interp eval $i [list set ::FILENAME $file]
     interp eval $i {set ::FNR 0}
     foreach script [dict getnull $commands BEGINFILE] {
-        interp eval $i [list uplevel #0 $script]
+        interp eval $i $script
     }
     try {
         foreach_line line $file $gets {
@@ -249,7 +249,6 @@ proc process_file {i file gets splitter} {
             interp eval $i [list set ::NF [llength $fields]]
             interp eval $i [list set ::F(0) $line]
             interp eval $i [list array set ::F [numberlist $fields]]
-            set fields [linsert $fields 0 $line]
             interp eval $i {trace add variable ::NF write ::internal::trace_nf}
             interp eval $i {trace add variable ::F write ::internal::trace_f}
             foreach pattern [dict getnull $commands patterns] {
@@ -257,15 +256,22 @@ proc process_file {i file gets splitter} {
                     switch [lindex $pattern 0] {
                         expr {
                               lassign $pattern _ test script
-                              if {[interp eval $i uplevel #0 expr $test]} {
-                                  set script [lindex $pattern 2]
-                                  interp eval $i uplevel #0 $script
-                              }
+                              interp eval $i [list if $test $script]
                           }
                         re {
                             lassign $pattern _ field re script
-                            if {[regexp $re [lindex $fields $field]]} {
-                                interp eval $i uplevel #0 $script
+                            if {![string is integer $field] || $field < 0} {
+                                error "Attempt to use out-of-range field index."
+                            }
+                            if {$field <= [interp eval $i {array size ::F}]} {
+                                set val \
+                                    [interp eval $i \
+                                         [list set [format "::F(%d)" $field]]]
+                            } else {
+                                set val ""
+                            }
+                            if {[regexp $re $val]} {
+                                interp eval $i $script
                             }
                         }
                     }
@@ -282,7 +288,7 @@ proc process_file {i file gets splitter} {
         }
     } on 5 {} { }
     foreach script [dict getnull $commands ENDFILE] {
-        interp eval $i [list uplevel #0 $script]
+        interp eval $i $script
     }
 }
 
@@ -297,7 +303,7 @@ proc tawk {i files gets splitter} {
     interp eval $i {set ::NF 0}
     
     foreach script [dict getnull $commands BEGIN] {
-        interp eval $i [list uplevel #0 $script]
+        interp eval $i $script
     }
     foreach file $files {
         if {[regexp {^(\w+)=(.*)} $file -> varname varval]} {
@@ -312,7 +318,7 @@ proc tawk {i files gets splitter} {
         process_file $i - $gets $splitter
     }
     foreach script [dict getnull $commands END] {
-        interp eval $i [list uplevel #0 $script]
+        interp eval $i $script
     }
 }
 
@@ -339,8 +345,11 @@ proc ENDFILE {body} {
 proc line args {
     variable commands
     switch [llength $args] {
-        1 { dict lappend commands patterns [list expr 1 $args] }
-        2 { dict lappend commands patterns [list expr {*}$args] }
+        1 { dict lappend commands patterns [list expr 1 {*}$args] }
+        2 {
+            lassign $args test body
+            dict lappend commands patterns [list expr $test $body]
+        }
         default { error "Invalid number of arguments to line command" }
     }
 }
@@ -386,7 +395,7 @@ proc main {argv} {
         interp eval $i {trace add variable ::FS unset ::internal::trace_fs}
         if {$params(f) ne ""} {
             if {[interp issafe $i]} {
-                interp invokehidden $i [list source $params(f)]
+                interp invokehidden $i source $params(f)
             } else {
                 interp eval $i [list source $params(f)]
             }
