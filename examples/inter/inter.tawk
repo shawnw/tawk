@@ -1,0 +1,13 @@
+line {$FNR == $NR} {
+     dict set vals $F(1) $F(2) $F(0)
+     continue
+}
+line {
+     for {set i $F(2)} {$i <= $F(3)} {incr i} {
+         if {[dict exists $vals $F(1) $i]} {
+            puts [dict get $vals $F(1) $i]
+         } else {
+            print $F(1) $i N N N
+         }
+     }
+}

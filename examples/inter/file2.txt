@@ -1,0 +1,7 @@
+cat02 1 xxx xxx
+cat02 2 xxx sss www
+cat02 3 swe ede rrr
+cat02 5 aws ede as
+cat02 6 aqw
+cat03 2 wer
+cat03 3 ddddd

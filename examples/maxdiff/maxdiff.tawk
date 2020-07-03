@@ -1,0 +1,19 @@
+#!/usr/bin/env tawk -f
+line {$F(1) > -1000 && $F(2) > -1000} {
+    set d [expr {$F(1) - $F(2)}]
+    if {[info exists diffs($FNR)]} {
+        set diffs($FNR) [expr {max($diffs($FNR),$d)}]
+    } else {
+        set diffs($FNR) $d
+    }
+}
+
+END {
+    for {set n 1} {$n <= $FNR} {incr n} {
+        if {[info exists diffs($n)]} {
+            puts $diffs($n)
+        } else {
+            puts -99999
+        }
+    }
+}
