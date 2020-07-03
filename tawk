@@ -28,6 +28,8 @@ package require textutil::split
 package require cmdline
 package require csv
 
+set version 0.9.0
+
 set commands [dict create]
 
 proc setup_interp {i} {
@@ -373,22 +375,28 @@ proc rline args {
 proc main {argv} {
     set options {
         {f.arg "" "Filename to load instead of script given on the command line."}
-        {F.arg "" "Field separator (Regular expression)"}
+        {F.arg "" "Field separator."}
         {csv "Input is CSV data."}
         {safe "Execute script in safe mode."}
         {timeout.arg 0 "Error if script takes more than N seconds to run (0 for no timeout)." }
+        {version "Print version."}
     }
     set usage {[OPTIONS] ['script'] [VAR=VALUE | FILENAME] ...}
 
     try {
         array set params [::cmdline::getoptions argv $options $usage]
+        if {[info exists params(version)] && $params(version)} {
+            puts "[file tail $::argv0] $::version"
+            exit 0
+        }
         if {[info exists params(safe)] && $params(safe)} {
             set i [interp create -safe]
         } else {
             set i [interp create]
         }
         if {$params(timeout) > 0} {
-            interp limit $i time -seconds [expr {[clock seconds] + $params(timeout)}]
+            interp limit $i time -seconds \
+                [expr {[clock seconds] + $params(timeout)}]
         }
         setup_interp $i
         interp eval $i [list set ::FS $params(F)]
