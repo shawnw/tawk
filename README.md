@@ -74,6 +74,8 @@ Most of these are lifted straight from `awk` names.
 * `NR` The current line number.
 * `FNR` The line number of the current file.
 * `FILENAME` The name of the current file, `-` for standard input.
+* `INFILE` The file handle of the current file. Only set in
+  `BEGINFILE`, `line` and `rline` blocks.
 * `FS` If set, a single character, or regular expression that is used
   to indicate field delimiters. If an empty string or not set, any
   amount of whitespace is used.

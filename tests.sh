@@ -364,6 +364,16 @@ else
     fail+=1
 fi
 
+if output=$(./tawk 'BEGINFILE { gets $INFILE }
+   line { incr sum $F(2) }
+   END { puts $sum }' data.txt) \
+         && [[ $output -eq 9 ]]; then
+    echo "Test 32: Pass"
+    pass+=1
+else
+    echo "Test 32: Fail"
+    fail+=1
+fi
 
 echo "Done."
 echo "$pass tests passed, $fail tests failed."

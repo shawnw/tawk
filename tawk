@@ -28,7 +28,7 @@ package require textutil::split
 package require cmdline
 package require csv
 
-set version 0.9.0
+set version 0.9.1
 
 set commands [dict create]
 
@@ -145,28 +145,18 @@ proc cleanup_interp {i} {
 }
 
 # Open file and call body for each line read from it.
-proc foreach_line {var filename gets body} {
+proc foreach_line {var f gets body} {
     upvar $var line
-    if {$filename eq "-"} {
-        set f stdin
-    } else {
-        set f [open $filename r]
-    }
     while {[$gets $f line] >= 0} {
         try {
             uplevel 1 $body
         } on error {msg opts} {
-            if {$filename ne "-"} { close $f }
             return -options $opts -level 2 $msg
         } on return {msg opts} {
-            if {$filename ne "-"} { close $f }
             return -options $opts -level 2
         } on break {} {
             break
         }
-    }
-    if {$filename ne "-"} {
-        close $f
     }
 }
 
@@ -232,16 +222,29 @@ proc split_csv {line fs} {
     }
 }
 
-proc process_file {i file gets splitter} {
+proc process_file {i filename gets splitter} {
     variable commands
 
-    interp eval $i [list set ::FILENAME $file]
+    interp eval $i [list set ::FILENAME $filename]
     interp eval $i {set ::FNR 0}
-    foreach script [dict getnull $commands BEGINFILE] {
-        interp eval $i $script
+    if {$filename eq "-"} {
+        set f stdin
+    } else {
+        set f [open $filename r]
+        interp share "" $f $i
     }
+    interp eval $i [list set ::INFILE $f]
+
     try {
-        foreach_line line $file $gets {
+        try {
+            foreach script [dict getnull $commands BEGINFILE] {
+                interp eval $i $script
+            }
+        } on break {} {
+            return -level 0 -code 5
+        }
+
+        foreach_line line $f $gets {
             interp eval $i {incr ::FNR}
             interp eval $i {incr ::NR}
             interp eval $i {array unset ::F}
@@ -288,9 +291,23 @@ proc process_file {i file gets splitter} {
                 }
             }
         }
-    } on 5 {} { }
-    foreach script [dict getnull $commands ENDFILE] {
-        interp eval $i $script
+        try {
+            foreach script [dict getnull $commands ENDFILE] {
+                interp eval $i $script
+            }
+        } on break {} {
+            return -level 0 -code 5
+        }
+
+    } on error {msg opts} {
+        return -options $opts $msg
+    } on 5 {} {
+    } finally {
+        if {$filename ne "-"} {
+            close $f
+            interp eval $i {close $::INFILE}
+        }
+        interp eval $i {unset ::INFILE}
     }
 }
 
