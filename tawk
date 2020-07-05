@@ -28,7 +28,17 @@ package require textutil::split
 package require cmdline
 package require csv
 
-set version 0.9.1
+# Version scheme:
+
+# 0.X.Y - Increment X for things that change existing behavior, or new
+# features .Y for bug fixes.
+
+# 1.0.0 - First "done" release.
+
+# X.Y.Z - Increment X for things that break backwards compatibility,
+# Y for new features, Z for bug fixes.
+
+set version 0.10.0
 
 set commands [dict create]
 
@@ -121,11 +131,6 @@ proc setup_interp {i} {
             trace add variable ::F write ::internal::trace_f
         }
         
-        proc trace_fs {_ _ _} {
-            set ::FS ""
-            trace add variable ::FS unset ::internal::trace_fs
-        }
-
         proc trace_raise_error {var _ op} {
             error "Unable to $op protected variable $var"
         }
@@ -187,12 +192,13 @@ proc numberlist {lst} {
 }
 
 proc split_re {line fs} {
-    if {$fs eq ""} {
-        return [::textutil::split::splitx $line]
-    } elseif {[string length $fs] == 1} {
-        return [split $line $fs]
+    lassign $fs mode val
+    if {$mode eq "whitespace" || $val eq " "} {
+        return [::textutil::split::splitx [string trim $line] {\s+}]
+    } elseif {[string length $val] <= 1} {
+        return [split $line $val]
     } else {
-        return [::textutil::split::splitx $line $fs]
+        return [::textutil::split::splitx $line $val]
     }
 }
 
@@ -215,10 +221,11 @@ proc gets_csv {file linevar} {
 }
 
 proc split_csv {line fs} {
-    if {$fs eq ""} {
+    lassign $fs mode val
+    if {$mode eq "whitespace"} {
         return [::csv::split $line]
     } else {
-        return [::csv::split $line $fs]
+        return [::csv::split $line $val]
     }
 }
 
@@ -249,7 +256,11 @@ proc process_file {i filename gets splitter} {
             interp eval $i {incr ::NR}
             interp eval $i {array unset ::F}
             interp eval $i {unset ::NF}
-            set fs [interp eval $i {set ::FS}]
+            if {[interp eval $i {info exists ::FS}]} {
+                set fs [list present [interp eval $i {set ::FS}]]
+            } else {
+                set fs whitespace
+            }
             set fields [$splitter $line $fs]
             interp eval $i [list set ::NF [llength $fields]]
             interp eval $i [list set ::F(0) $line]
@@ -392,7 +403,7 @@ proc rline args {
 proc main {argv} {
     set options {
         {f.arg "" "Filename to load instead of script given on the command line."}
-        {F.arg "" "Field separator."}
+        {F.arg whitespace "Field separator."}
         {csv "Input is CSV data."}
         {safe "Execute script in safe mode."}
         {timeout.arg 0 "Error if script takes more than N seconds to run (0 for no timeout)." }
@@ -416,8 +427,9 @@ proc main {argv} {
                 [expr {[clock seconds] + $params(timeout)}]
         }
         setup_interp $i
-        interp eval $i [list set ::FS $params(F)]
-        interp eval $i {trace add variable ::FS unset ::internal::trace_fs}
+        if {$params(F) ne "whitespace"} {
+            interp eval $i [list set ::FS $params(F)]
+        }
         if {$params(f) ne ""} {
             if {[interp issafe $i]} {
                 interp invokehidden $i source $params(f)

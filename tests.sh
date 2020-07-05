@@ -375,6 +375,16 @@ else
     fail+=1
 fi
 
+# Test null FS
+if output=$(echo "abcd" | ./tawk -F '' 'line { puts $NF }') \
+        && [[ $output -eq 4 ]]; then
+    echo "Test 33: Pass"
+    pass+=1
+else
+    echo "Test 33: Fail"
+    fail+=1
+fi
+
 echo "Done."
 echo "$pass tests passed, $fail tests failed."
 if [[ $fail -ne 0 ]]; then

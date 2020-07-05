@@ -77,18 +77,26 @@ Most of these are lifted straight from `awk` names.
 * `INFILE` The file handle of the current file. Only set in
   `BEGINFILE`, `line` and `rline` blocks.
 * `FS` If set, a single character, or regular expression that is used
-  to indicate field delimiters. If an empty string or not set, any
-  amount of whitespace is used.
+  to indicate field delimiters. If a a single space, or not set, any
+  amount of whitespace is used, and leading and trailing whitespace is
+  first stripped. If an empty string, splits every character into its
+  own field.
 * `OFS` Used to separate fields in `F(0)` when other elements of `F`
   are written to or `NF` is changed.
-* `CSV` 1 if in CSV mode, 0 if in normal mode.
+* `CSV` 1 if in CSV mode, 0 if in normal mode. (Read-only)
 
 CSV Mode
 --------
 
-If invoked with the `-csv` option, the default field separator (`FS`)
-and output field separator (`OFS`) are set to comma instead of
-whitespace, and lines are split by a CSV parser - so commas in quoted
-fields don't count, unlike if just setting `FS` to a comma. Also, the
-`print` command CSV-escapes its arguments, and `gets` reads a full CSV
-record, which may be multiple lines.
+If invoked with the `-csv` option, the output field separator (`OFS`)
+is set to comma instead of a space, `print` joins its arguments with
+CSV escaping.
+
+When reading fields, the default field separator (`FS`) if not
+explicitly set is a comma, and only single-character separators are
+supported. Lines are split by a CSV-aware parser - so commas in quoted
+fields don't count, unlike if just setting `FS` to a comma in normal
+mode.
+
+Also, the `print` command CSV-escapes its arguments, and `gets` reads
+a full CSV record, which may be multiple lines.
