@@ -376,12 +376,112 @@ else
 fi
 
 # Test null FS
-if output=$(echo "abcd" | ./tawk -F '' 'line { puts $NF }') \
+if output=$(./tawk -F '' 'line { puts $NF }' <<<"abcd" ) \
         && [[ $output -eq 4 ]]; then
     echo "Test 33: Pass"
     pass+=1
 else
     echo "Test 33: Fail"
+    fail+=1
+fi
+
+# Test setting F(0)
+if output=$(./tawk '
+   line { set FS "|"
+          set F(0) "1|2|3"
+          puts $F(1)
+   }' <<<"a b c") && [[ $output -eq 1 ]]; then
+    echo "Test 34: Pass"
+    pass+=1
+else
+    echo "Test 34: Fail"
+    fail+=1
+fi
+
+if output=$(./tawk '
+   line { set FS "|"
+          set F(0) "1|2|3|4"
+          puts $NF
+   }' <<<"a b c" ) && [[ $output -eq 4 ]]; then
+    echo "Test 35: Pass"
+    pass+=1
+else
+    echo "Test 35: Fail"
+    fail+=1
+fi
+
+# Test setting NF
+# shrinking
+if output=$(./tawk '
+   line { set NF 2
+          print
+   }' <<<"a b c") && [[ $output = "a b" ]]; then
+    echo "Test 36: Pass"
+    pass+=1
+else
+    echo "Test 36: Fail"
+    fail+=1
+fi
+
+# growing
+if output=$(./tawk '
+   BEGIN { set OFS , }
+   line { set NF 5
+          print
+   }' <<<"a b c" ) && [[ $output = "a,b,c,," ]]; then
+    echo "Test 37: Pass"
+    pass+=1
+else
+    echo "Test 37: Fail"
+    fail+=1
+fi
+
+# Setting NF to 0
+if output=$(./tawk '
+   BEGIN { set OFS , }
+   line { set NF 0
+          print
+   }' <<<"a b c" ) && [[ -z $output ]]; then
+    echo "Test 38: Pass"
+    pass+=1
+else
+    echo "Test 38: Fail"
+    fail+=1
+fi
+
+
+# Test setting a higher than existing F(x)
+if output=$(./tawk '
+   BEGIN { set OFS , }
+   line { set F(5) e
+          print
+   }' <<<"a b c" ) && [[ $output = "a,b,c,,e" ]]; then
+    echo "Test 39: Pass"
+    pass+=1
+else
+    echo "Test 39: Fail"
+    fail+=1
+fi
+
+
+if output=$(./tawk '
+   line { set F(5) e
+          puts $NF
+   }' <<<"a b c" ) && [[ $output -eq 5 ]]; then
+    echo "Test 40: Pass"
+    pass+=1
+else
+    echo "Test 40: Fail"
+    fail+=1
+fi
+
+# Test an empty input line
+if output=$(./tawk 'line { puts $NF }' <<<"") \
+         && [[ $output -eq 0 ]]; then
+    echo "Test 41: Pass"
+    pass+=1
+else
+    echo "Test 41: Fail"
     fail+=1
 fi
 

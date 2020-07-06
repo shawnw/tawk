@@ -38,7 +38,7 @@ package require csv
 # X.Y.Z - Increment X for things that break backwards compatibility,
 # Y for new features, Z for bug fixes.
 
-set version 0.10.0
+set version 0.11.0
 
 set commands [dict create]
 
@@ -55,6 +55,7 @@ proc setup_interp {i} {
     interp alias $i rline {} rline
     interp alias $i csv_join {} ::csv::join
     interp alias $i csv_split {} ::csv::split
+    interp alias $i ::internal::numberlist {} numberlist
 
     interp eval $i {namespace eval internal {
         proc build_f0_normal {} {
@@ -87,17 +88,35 @@ proc setup_interp {i} {
         }
 
         proc trace_f {_ key _} {
-            if {![string is integer $key] || $key <= 0} {
+            if {![string is integer $key] || $key < 0} {
                 error "Attempt to use out-of-range field index."
             }
-            set len [expr {[array size ::F] - 1}]
             trace remove variable ::F write ::internal::trace_f
-            if {$key > $len} {
-                for {set i [expr {$len + 1}]} {$i < $key} {incr i} {
-                    set ::F($i) ""
+            if {$key == 0} {
+                set line $::F(0)
+                unset ::F ::NF
+                set ::F(0) $line
+                if {[info exists ::FS]} {
+                    if {$::FS eq " "} {
+                        set fs whitespace
+                    } else {
+                        set fs [list present $::FS]
+                    }
+                } else {
+                    set fs whitespace
+                }
+                set fields [split_line $line $fs]
+                set ::NF [llength $fields]
+                array set ::F [numberlist $fields]
+                trace add variable ::NF write ::internal::trace_nf
+            } else {
+                if {$key > $::NF} {
+                    for {set i [expr {$::NF + 1}]} {$i < $key} {incr i} {
+                        set ::F($i) ""
+                    }
                 }
                 trace remove variable ::NF write ::internal::trace_nf
-                set ::NF $key
+                set ::NF [expr {[array size ::F] - 1}]
                 trace add variable ::NF write ::internal::trace_nf
             }
             if {$::CSV} {
@@ -109,17 +128,17 @@ proc setup_interp {i} {
         }
 
         proc trace_nf {_ _ _} {
-            if {![string is integer $::NF] || $::NF <= 0} {
+            if {![string is integer $::NF] || $::NF < 0} {
                 error "Attempt to set NF to an out of range value."
             }
             set len [expr {[array size ::F] - 1}]
             trace remove variable ::F write ::internal::trace_f
             if {$len < $::NF} {
-                for {set i $len} {$i <= $::NF} {incr i} {
+                for {set i [expr {$len + 1}]} {$i <= $::NF} {incr i} {
                     set ::F($i) ""
                 }
             } elseif {$len > $::NF} {
-                for {set i $::NF} {$i > $len} {incr i -1} {
+                for {set i $len} {$i > $::NF} {incr i -1} {
                     unset ::F($i)
                 }
             }
@@ -453,13 +472,14 @@ proc main {argv} {
             interp eval $i {set ::OFS ","}
             interp eval $i {proc print args {
                 if {[llength $args] == 0} {
-                    puts $F(0)
+                    puts $::F(0)
                 } else {
                     puts [csv_join $args $::OFS]
                 }
             }}
             interp hide $i gets
             interp alias $i gets {} gets_csv
+            interp alias $i ::internal::split_line {} split_csv
         } else {
             set csv_mode false
             set gets_cmd gets
@@ -468,11 +488,12 @@ proc main {argv} {
             interp eval $i {set ::OFS " "}
             interp eval $i {proc print args {
                 if {[llength $args] == 0} {
-                    puts $F(0)
+                    puts $::F(0)
                 } else {
                     puts [join $args $::OFS]
                 }
             }}
+            interp alias $i ::internal::split_line {} split_re
         }
         tawk $i $files $gets_cmd $splitter_cmd
         interp delete $i

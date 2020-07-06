@@ -69,7 +69,10 @@ Variables
 
 Most of these are lifted straight from `awk` names.
 
-* `F` An array holding the columns of the line. `$F(0)` is the whole line.
+* `F` An array holding the columns of the line. `$F(0)` is the whole
+  line. Setting a new element above `NF` fills in the missing interval
+  with empty strings. Setting `F(0)` rebuilds the rest of the array
+  based on splitting the new value.
 * `NF` The number of fields in the current line. Modifying this adjusts `F`.
 * `NR` The current line number.
 * `FNR` The line number of the current file.
@@ -89,7 +92,7 @@ CSV Mode
 --------
 
 If invoked with the `-csv` option, the output field separator (`OFS`)
-is set to comma instead of a space, `print` joins its arguments with
+is set to comma instead of a space, and `print` joins its arguments with
 CSV escaping.
 
 When reading fields, the default field separator (`FS`) if not
