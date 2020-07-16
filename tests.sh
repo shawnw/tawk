@@ -327,15 +327,6 @@ if output=$(./tawk '
    BEGIN { set sum 0 }
    rline -field 2 {[bc]} { incr sum $F(2) }
    END { puts $sum }' data.txt) && [[ $output -eq 0 ]]; then
-    echo "Test 27: Pass"
-    pass+=1
-else
-    echo "Test 27: Fail"
-    fail+=1
-fi
-
-# Test invalid field numbers for rline
-if ! ./tawk 'rline -field foo {[ab]} { puts $::F(0) }' data.txt 2>/dev/null; then
     echo "Test 28: Pass"
     pass+=1
 else
@@ -343,7 +334,8 @@ else
     fail+=1
 fi
 
-if ! ./tawk 'rline -field -1 {[ab]} { puts $F(0) }' data.txt 2>/dev/null; then
+# Test invalid field numbers for rline
+if ! ./tawk 'rline -field foo {[ab]} { puts $::F(0) }' data.txt 2>/dev/null; then
     echo "Test 29: Pass"
     pass+=1
 else
@@ -351,9 +343,7 @@ else
     fail+=1
 fi
 
-# Out of range positive fields are an empty string.
-if output=$(./tawk 'rline -field 40 {[ab]} { puts $F(0) }' data.txt) \
-   && [[ $output = "" ]]; then
+if ! ./tawk 'rline -field -1 {[ab]} { puts $F(0) }' data.txt 2>/dev/null; then
     echo "Test 30: Pass"
     pass+=1
 else
@@ -361,8 +351,9 @@ else
     fail+=1
 fi
 
-if output=$(./tawk 'rline -field 40 {^$} { puts $F(0) }' data.txt) \
-   && [[ $output != "" ]]; then
+# Out of range positive fields are an empty string.
+if output=$(./tawk 'rline -field 40 {[ab]} { puts $F(0) }' data.txt) \
+   && [[ $output = "" ]]; then
     echo "Test 31: Pass"
     pass+=1
 else
@@ -370,10 +361,8 @@ else
     fail+=1
 fi
 
-if output=$(./tawk 'BEGINFILE { gets $INFILE }
-   line { incr sum $F(2) }
-   END { puts $sum }' data.txt) \
-         && [[ $output -eq 9 ]]; then
+if output=$(./tawk 'rline -field 40 {^$} { puts $F(0) }' data.txt) \
+   && [[ $output != "" ]]; then
     echo "Test 32: Pass"
     pass+=1
 else
@@ -381,13 +370,24 @@ else
     fail+=1
 fi
 
-# Test null FS
-if output=$(./tawk -F '' 'line { puts $NF }' <<<"abcd" ) \
-        && [[ $output -eq 4 ]]; then
+if output=$(./tawk 'BEGINFILE { gets $INFILE }
+   line { incr sum $F(2) }
+   END { puts $sum }' data.txt) \
+         && [[ $output -eq 9 ]]; then
     echo "Test 33: Pass"
     pass+=1
 else
     echo "Test 33: Fail"
+    fail+=1
+fi
+
+# Test null FS
+if output=$(./tawk -F '' 'line { puts $NF }' <<<"abcd" ) \
+        && [[ $output -eq 4 ]]; then
+    echo "Test 34: Pass"
+    pass+=1
+else
+    echo "Test 34: Fail"
     fail+=1
 fi
 
@@ -397,10 +397,10 @@ if output=$(./tawk '
           set F(0) "1|2|3"
           puts $F(1)
    }' <<<"a b c") && [[ $output -eq 1 ]]; then
-    echo "Test 34: Pass"
+    echo "Test 35: Pass"
     pass+=1
 else
-    echo "Test 34: Fail"
+    echo "Test 35: Fail"
     fail+=1
 fi
 
@@ -409,10 +409,10 @@ if output=$(./tawk '
           set F(0) "1|2|3|4"
           puts $NF
    }' <<<"a b c" ) && [[ $output -eq 4 ]]; then
-    echo "Test 35: Pass"
+    echo "Test 36: Pass"
     pass+=1
 else
-    echo "Test 35: Fail"
+    echo "Test 36: Fail"
     fail+=1
 fi
 
@@ -422,10 +422,10 @@ if output=$(./tawk '
    line { set NF 2
           print
    }' <<<"a b c") && [[ $output = "a b" ]]; then
-    echo "Test 36: Pass"
+    echo "Test 37: Pass"
     pass+=1
 else
-    echo "Test 36: Fail"
+    echo "Test 37: Fail"
     fail+=1
 fi
 
@@ -435,10 +435,10 @@ if output=$(./tawk '
    line { set NF 5
           print
    }' <<<"a b c" ) && [[ $output = "a,b,c,," ]]; then
-    echo "Test 37: Pass"
+    echo "Test 38: Pass"
     pass+=1
 else
-    echo "Test 37: Fail"
+    echo "Test 38: Fail"
     fail+=1
 fi
 
@@ -448,10 +448,10 @@ if output=$(./tawk '
    line { set NF 0
           print
    }' <<<"a b c" ) && [[ -z $output ]]; then
-    echo "Test 38: Pass"
+    echo "Test 39: Pass"
     pass+=1
 else
-    echo "Test 38: Fail"
+    echo "Test 39: Fail"
     fail+=1
 fi
 
@@ -462,10 +462,10 @@ if output=$(./tawk '
    line { set F(5) e
           print
    }' <<<"a b c" ) && [[ $output = "a,b,c,,e" ]]; then
-    echo "Test 39: Pass"
+    echo "Test 40: Pass"
     pass+=1
 else
-    echo "Test 39: Fail"
+    echo "Test 40: Fail"
     fail+=1
 fi
 
@@ -474,20 +474,20 @@ if output=$(./tawk '
    line { set F(5) e
           puts $NF
    }' <<<"a b c" ) && [[ $output -eq 5 ]]; then
-    echo "Test 40: Pass"
+    echo "Test 41: Pass"
     pass+=1
 else
-    echo "Test 40: Fail"
+    echo "Test 41: Fail"
     fail+=1
 fi
 
 # Test an empty input line
 if output=$(./tawk 'line { puts $NF }' <<<"") \
          && [[ $output -eq 0 ]]; then
-    echo "Test 41: Pass"
+    echo "Test 42: Pass"
     pass+=1
 else
-    echo "Test 41: Fail"
+    echo "Test 42: Fail"
     fail+=1
 fi
 
