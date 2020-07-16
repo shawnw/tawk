@@ -228,7 +228,7 @@ proc gets_csv {file linevar} {
     while {[set len [gets $file tmp]] >= 0} {
         incr totlen $len
         if {$line ne ""} {
-            set line [string cat $line "\n" $tmp]
+            append line "\n" $tmp
         } else {
             set line $tmp
         }
