@@ -73,9 +73,6 @@ proc setup_interp {i} {
         }
 
         proc trace_ofs {_ _ op} {
-            if {$op eq "unset"} {
-                error "Unable to unset OFS"
-            }
             if {[array exists ::F]} {
                 trace remove variable ::F write ::internal::trace_f
                 if {$::CSV} {
@@ -346,8 +343,8 @@ proc tawk {i files gets splitter} {
  
     set nfiles_processed 0
     
-    interp eval $i {trace add variable ::OFS {write unset} ::internal::trace_ofs}
-    interp eval $i {trace add variable ::CSV {write unset} ::internal::trace_raise_error}
+    interp eval $i {trace add variable ::OFS write ::internal::trace_ofs}
+    interp eval $i {trace add variable ::CSV write ::internal::trace_raise_error}
     interp eval $i {set ::NR 0}
     interp eval $i {set ::NF 0}
     
