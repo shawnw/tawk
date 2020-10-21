@@ -32,6 +32,9 @@ Options
 * `-timeout N` Exit with an error if a script takes more than `N`
   seconds to complete.
 * `-csv` Turn on CSV line parsing. Prefer this over setting `FS` to a comma.
+* `-quotechar C` Use the given character instead of double quote for
+  quoted CSV fields.
+* `-quoteall` Always quote every CSV field when printing.
 
 The language
 ============
@@ -50,14 +53,16 @@ Commands
 * `line script` Executed for every line read.
 * `line test script` If `test` returns true when evaluated by `expr`,
   execute the script.
-* `rline [-field N] re script` If the regular expression `re` matches the line,
-  (Or the specified field), execute the script.
+* `rline [-field N] re script` If the regular expression `re` matches
+  the line, (Or the specified field), execute the script.
 
 ### These are available everywhere
 * `print [arg ...]` Print out all its arguments joined by `$OFS`, or
   `$F(0)` if called with no arguments.
-* `csv_join arglist [delim]` Return the list joined into a CSV-formatted string.
-* `csv_split string [delim]` Split a CSV-formatted string into a list.
+* `csv_join arglist [delim] [quotechar] [quotemode]` Return the list
+  joined into a CSV-formatted string.
+* `csv_split string [delim] [quotechar]` Split a CSV-formatted string
+  into a list.
 
 ### Changes to existing commands
 
@@ -87,19 +92,25 @@ Most of these are lifted straight from `awk` names.
 * `OFS` Used to separate fields in `F(0)` when other elements of `F`
   are written to or `NF` is changed.
 * `CSV` 1 if in CSV mode, 0 if in normal mode. (Read-only)
+* `CSVQUOTECHAR` when in CSV mode, the character used to quote
+  fields. Set by the `-quotechar` option.
+* `CSVQUOTE` Set to `always` to always quote CSV fields (Turned on by
+  the `-quoteall` argument), or `auto` to only quote when
+  needed. Attempting to set other values raises an error.
 
 CSV Mode
 --------
 
 If invoked with the `-csv` option, the output field separator (`OFS`)
-is set to comma instead of a space, and `print` joins its arguments with
-CSV escaping.
+is set to comma instead of a space, and `print` joins its arguments
+with CSV escaping.
 
 When reading fields, the default field separator (`FS`) if not
 explicitly set is a comma, and only single-character separators are
 supported. Lines are split by a CSV-aware parser - so commas in quoted
 fields don't count, unlike if just setting `FS` to a comma in normal
-mode.
+mode. The `CSVQUOTECHAR` variable controls the character used to quote
+fields (Defaults to double quote, set by the `-quotechar` option.)
 
 Also, the `print` command CSV-escapes its arguments, and `gets` reads
 a full CSV record, which may be multiple lines.

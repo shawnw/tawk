@@ -69,7 +69,7 @@ proc setup_interp {i} {
             set new_f0 [lmap i [lrange [lsort -integer [array names ::F]] 1 end] {
                 set ::F($i)
             }]
-            return [csv_join $new_f0 $::OFS]
+            return [csv_join $new_f0 $::OFS $::CSVQUOTECHAR $::CSVQUOTE]
         }
 
         proc trace_ofs {_ _ op} {
@@ -145,6 +145,13 @@ proc setup_interp {i} {
                 set ::F(0) [build_f0_normal]
             }
             trace add variable ::F write ::internal::trace_f
+        }
+
+        proc trace_csvquote {_ _ _} {
+            set valid_options {always auto}
+            if {[lsearch -sorted $valid_options $::CSVQUOTE] == -1} {
+                error "CSVQUOTE must be one of: auto, always"
+            }
         }
         
         proc trace_raise_error {var _ op} {
@@ -236,12 +243,12 @@ proc gets_csv {file linevar} {
     return $len
 }
 
-proc split_csv {line fs} {
+proc split_csv {line fs {quotechar \"}} {
     lassign $fs mode val
     if {$mode eq "whitespace"} {
-        return [::csv::split $line]
+        return [::csv::split $line , $quotechar]
     } else {
-        return [::csv::split $line $val]
+        return [::csv::split $line $val $quotechar]
     }
 }
 
@@ -421,6 +428,8 @@ proc main {argv} {
         {f.arg "" "Filename to load instead of script given on the command line."}
         {F.arg whitespace "Field separator."}
         {csv "Input is CSV data."}
+        {quoteall "Always quote CSV fields."}
+        {quotechar.arg \" "Use this character to quote CSV fields."}
         {safe "Execute script in safe mode."}
         {timeout.arg 0 "Error if script takes more than N seconds to run (0 for no timeout)." }
         {version "Print version."}
@@ -465,13 +474,22 @@ proc main {argv} {
             set csv_mode true
             set gets_cmd gets_csv
             set splitter_cmd split_csv
+            interp eval $i [list set ::CSVQUOTECHAR $params(quotechar)]
+            if {[info exists params(quoteall)] && $params(quoteall)} {
+                interp eval $i {set ::CSVQUOTE always}
+            } else {
+                interp eval $i {set ::CSVQUOTE auto}
+            }
+            interp eval $i \
+                {trace add variable ::CSVQUOTE write \
+                    ::internal::trace_csvquote}
             interp eval $i {set ::CSV 1}
             interp eval $i {set ::OFS ","}
             interp eval $i {proc print args {
                 if {[llength $args] == 0} {
                     puts $::F(0)
                 } else {
-                    puts [csv_join $args $::OFS]
+                    puts [csv_join $args $::OFS $::CSVQUOTECHAR $::CSVQUOTE]
                 }
             }}
             interp hide $i gets

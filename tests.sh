@@ -469,7 +469,6 @@ else
     fail+=1
 fi
 
-
 if output=$(./tawk '
    line { set F(5) e
           puts $NF
@@ -490,6 +489,84 @@ else
     echo "Test 42: Fail"
     fail+=1
 fi
+
+# Test always quoting CSV fields
+cat <<EOF >data4.csv
+"red fox","1"
+"brown dog","2"
+"grey cat","3"
+EOF
+if output=$(./tawk -csv -quoteall 'line { set F(1) $F(1); print }' \
+                   data2.csv > out.txt) \
+        && cmp out.txt data4.csv; then
+    echo "Test 43: Pass"
+    pass+=1
+else
+    echo "Test 43: Fail"
+    fail+=1
+fi
+
+# And a different quote char
+cat <<'EOF' >data4.csv
+%red fox%,%1%
+%brown dog%,%2%
+%grey cat%,%3%
+EOF
+if output=$(./tawk -csv -quoteall -quotechar '%' \
+                   'line { set F(1) $F(1);
+                           print
+                    }' \
+                   data2.csv > out.txt) \
+        && cmp out.txt data4.csv; then
+    echo "Test 44: Pass"
+    pass+=1
+else
+    echo "Test 44: Fail"
+    fail+=1
+fi
+
+# Test a valid setting for CSVQUOTE
+if ./tawk -csv 'BEGIN { set CSVQUOTE always }' data2.csv 2>/dev/null; then
+    echo "Test 45: Pass"
+    pass+=1
+else
+    echo "Test 45: Fail"
+    fail+=1
+fi
+
+# Test an invalid setting for CSVQUOTE
+if ! ./tawk -csv 'BEGIN { set CSVQUOTE never }' data2.csv 2>/dev/null; then
+    echo "Test 46: Pass"
+    pass+=1
+else
+    echo "Test 46: Fail"
+    fail+=1
+fi
+
+# Test csv_join with a custom quote char
+if ./tawk -F , 'line { puts [csv_join [list $F(1) $F(2)] , % always] }' \
+          data2.csv > out.txt \
+        && cmp out.txt data4.csv; then
+    echo "Test 47: Pass"
+    pass+=1
+else
+    echo "Test 47: Fail"
+    fail+=1
+fi
+
+# Test csv_split with a custom quote char
+if ./tawk 'line { puts [csv_join [csv_split $F(0) , %]] }' \
+          data4.csv > out.txt \
+        && cmp out.txt data2.csv; then
+    echo "Test 48: Pass"
+    pass+=1
+else
+    echo "Test 48: Fail"
+    fail+=1
+fi
+
+
+#### End of tests
 
 echo "Done."
 echo "$pass tests passed, $fail tests failed."
