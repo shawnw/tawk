@@ -38,7 +38,7 @@ package require csv
 # X.Y.Z - Increment X for things that break backwards compatibility,
 # Y for new features, Z for bug fixes.
 
-set version 0.11.0
+set version 0.12.0
 
 set commands [dict create]
 
@@ -153,11 +153,18 @@ proc setup_interp {i} {
                 error "CSVQUOTE must be one of: auto, always"
             }
         }
-        
+
+        proc trace_single_char_var {var _ op} {
+            upvar $var v
+            if {[string length $v] != 1} {
+                error "$var can only be one character"
+            }
+        }
+
         proc trace_raise_error {var _ op} {
             error "Unable to $op protected variable $var"
         }
-        
+
         namespace export trace_*
     }}
 }
@@ -166,7 +173,7 @@ proc cleanup_interp {i} {
     # Remove toplevel aliases after parsing script
     interp alias $i BEGIN {}
     interp alias $i END {}
-    interp alias $i BEGINFILE {} 
+    interp alias $i BEGINFILE {}
     interp alias $i ENDFILE {}
     interp alias $i line {}
     interp alias $i rline {}
@@ -347,14 +354,14 @@ proc process_file {i filename gets splitter} {
 
 proc tawk {i files gets splitter} {
     variable commands
- 
+
     set nfiles_processed 0
-    
+
     interp eval $i {trace add variable ::OFS write ::internal::trace_ofs}
     interp eval $i {trace add variable ::CSV write ::internal::trace_raise_error}
     interp eval $i {set ::NR 0}
     interp eval $i {set ::NF 0}
-    
+
     foreach script [dict getnull $commands BEGIN] {
         interp eval $i $script
     }
@@ -470,7 +477,7 @@ proc main {argv} {
             interp eval $i $script
         }
         cleanup_interp $i
-        if {[info exists params(csv)] && $params(csv)} {
+        if {$params(csv)} {
             set csv_mode true
             set gets_cmd gets_csv
             set splitter_cmd split_csv
@@ -485,7 +492,12 @@ proc main {argv} {
                     ::internal::trace_csvquote}
             interp eval $i {set ::CSV 1}
             interp eval $i {set ::OFS ","}
-            interp eval $i {proc print args {
+            interp eval $i {trace add variable ::OFS write \
+                                ::internal::trace_single_char_var}
+            interp eval $i {trace add variable ::FS write \
+                                ::internal::trace_single_char_var}
+            interp eval $i {
+                proc print args {
                 if {[llength $args] == 0} {
                     puts $::F(0)
                 } else {

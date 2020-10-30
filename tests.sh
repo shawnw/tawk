@@ -565,6 +565,41 @@ else
     fail+=1
 fi
 
+# Test CSV mode multi-char OFS error
+if ! ./tawk -csv 'BEGIN { set OFS ";;" }' data4.csv 2>/dev/null; then
+    echo "Test 49: Pass"
+    pass+=1
+else
+    echo "Test 49: Fail"
+    fail+=1
+fi
+
+# Test CSV mode multi-char FS error
+if ! ./tawk -csv 'BEGIN { set FS ";;" }' data4.csv 2>/dev/null; then
+    echo "Test 50: Pass"
+    pass+=1
+else
+    echo "Test 50: Fail"
+    fail+=1
+fi
+
+# Test normal mode multi-char OFS success
+if ./tawk 'BEGIN { set OFS ";;" }' data4.csv 2>/dev/null; then
+    echo "Test 51: Pass"
+    pass+=1
+else
+    echo "Test 51: Fail"
+    fail+=1
+fi
+
+# Test normal mode multi-char FS success
+if ./tawk 'BEGIN { set FS ";;" }' data4.csv 2>/dev/null; then
+    echo "Test 52: Pass"
+    pass+=1
+else
+    echo "Test 52: Fail"
+    fail+=1
+fi
 
 #### End of tests
 
