@@ -31,14 +31,14 @@ package require csv
 # Version scheme:
 
 # 0.X.Y - Increment X for things that change existing behavior, or new
-# features .Y for bug fixes.
+# features .Y for bug fixes and minor refactoring.
 
 # 1.0.0 - First "done" release.
 
 # X.Y.Z - Increment X for things that break backwards compatibility,
 # Y for new features, Z for bug fixes.
 
-set version 0.12.4
+set version 0.12.5
 
 set commands [dict create]
 
@@ -56,6 +56,9 @@ proc setup_interp {i} {
     interp alias $i csv_join {} ::csv::join
     interp alias $i csv_split {} ::csv::split
     interp alias $i ::internal::numberlist {} numberlist
+
+    interp eval $i {trace add variable ::OFS write ::internal::trace_ofs}
+    interp eval $i {trace add variable ::CSV write ::internal::trace_raise_error}
 
     interp eval $i {namespace eval internal {
         proc build_f0_normal {} {
@@ -167,6 +170,40 @@ proc setup_interp {i} {
 
         namespace export trace_*
     }}
+    if {[interp eval $i {set ::CSV}]} {
+        interp eval $i {trace add variable ::CSVQUOTECHAR write \
+                            ::internal::trace_single_char_var}
+        interp eval $i \
+            {trace add variable ::CSVQUOTE write \
+                 ::internal::trace_csvquote}
+        interp eval $i {set ::OFS ","}
+        interp eval $i {trace add variable ::OFS write \
+                            ::internal::trace_single_char_var}
+        interp eval $i {trace add variable ::FS write \
+                            ::internal::trace_single_char_var}
+        interp eval $i {
+            proc print args {
+                if {[llength $args] == 0} {
+                    puts $::F(0)
+                } else {
+                    puts [csv_join $args $::OFS $::CSVQUOTECHAR $::CSVQUOTE]
+                }
+            }}
+        interp hide $i gets
+        interp alias $i gets {} gets_csv
+        interp alias $i ::internal::split_line {} split_csv
+    } else {
+        interp eval $i {set ::OFS " "}
+        interp eval $i {
+            proc print args {
+                if {[llength $args] == 0} {
+                    puts $::F(0)
+                } else {
+                    puts [join $args $::OFS]
+                }
+            }}
+        interp alias $i ::internal::split_line {} split_re
+    }
 }
 
 proc cleanup_interp {i} {
@@ -357,8 +394,6 @@ proc tawk {i files gets splitter} {
 
     set nfiles_processed 0
 
-    interp eval $i {trace add variable ::OFS write ::internal::trace_ofs}
-    interp eval $i {trace add variable ::CSV write ::internal::trace_raise_error}
     interp eval $i {set ::NR 0}
     interp eval $i {set ::NF 0}
 
@@ -465,10 +500,28 @@ proc main {argv} {
             interp limit $i time -seconds \
                 [expr {[clock seconds] + $params(timeout)}]
         }
-        setup_interp $i
         if {$params(F) ne "whitespace"} {
             interp eval $i [list set ::FS $params(F)]
         }
+        if {$params(csv)} {
+            set gets_cmd gets_csv
+            set splitter_cmd split_csv
+            interp eval $i {set ::CSV 1}
+            if {[string length $params(quotechar)] != 1} {
+                error "-quotechar argument must be a single character."
+            }
+            interp eval $i [list set ::CSVQUOTECHAR $params(quotechar)]
+            if {$params(quoteall)} {
+                interp eval $i {set ::CSVQUOTE always}
+            } else {
+                interp eval $i {set ::CSVQUOTE auto}
+            }
+        } else {
+            set gets_cmd gets
+            set splitter_cmd split_re
+            interp eval $i {set ::CSV 0}
+        }
+        setup_interp $i
         if {$params(f) ne ""} {
             if {![file exists $params(f)]} {
                 error "File '$params(f)' does not exist."
@@ -487,57 +540,6 @@ proc main {argv} {
             interp eval $i $script
         }
         cleanup_interp $i
-        if {$params(csv)} {
-            set csv_mode true
-            set gets_cmd gets_csv
-            set splitter_cmd split_csv
-            if {[string length $params(quotechar)] != 1} {
-                error "-quotechar argument must be a single character."
-            }
-            interp eval $i [list set ::CSVQUOTECHAR $params(quotechar)]
-            interp eval $i {trace add variable ::CSVQUOTECHAR write \
-                                ::internal::trace_single_char_var}
-            if {[info exists params(quoteall)] && $params(quoteall)} {
-                interp eval $i {set ::CSVQUOTE always}
-            } else {
-                interp eval $i {set ::CSVQUOTE auto}
-            }
-            interp eval $i \
-                {trace add variable ::CSVQUOTE write \
-                    ::internal::trace_csvquote}
-            interp eval $i {set ::CSV 1}
-            interp eval $i {set ::OFS ","}
-            interp eval $i {trace add variable ::OFS write \
-                                ::internal::trace_single_char_var}
-            interp eval $i {trace add variable ::FS write \
-                                ::internal::trace_single_char_var}
-            interp eval $i {
-                proc print args {
-                    if {[llength $args] == 0} {
-                        puts $::F(0)
-                    } else {
-                        puts [csv_join $args $::OFS $::CSVQUOTECHAR $::CSVQUOTE]
-                    }
-            }}
-            interp hide $i gets
-            interp alias $i gets {} gets_csv
-            interp alias $i ::internal::split_line {} split_csv
-        } else {
-            set csv_mode false
-            set gets_cmd gets
-            set splitter_cmd split_re
-            interp eval $i {set ::CSV 0}
-            interp eval $i {set ::OFS " "}
-            interp eval $i {
-                proc print args {
-                    if {[llength $args] == 0} {
-                        puts $::F(0)
-                    } else {
-                        puts [join $args $::OFS]
-                    }
-            }}
-            interp alias $i ::internal::split_line {} split_re
-        }
         tawk $i $files $gets_cmd $splitter_cmd
         interp delete $i
     } trap {CMDLINE USAGE} {msg _} {
