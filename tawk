@@ -38,7 +38,7 @@ package require csv
 # X.Y.Z - Increment X for things that break backwards compatibility,
 # Y for new features, Z for bug fixes.
 
-set version 0.12.3
+set version 0.12.4
 
 set commands [dict create]
 
@@ -149,7 +149,7 @@ proc setup_interp {i} {
 
         proc trace_csvquote {_ _ _} {
             set valid_options {always auto}
-            if {[lsearch -sorted $valid_options $::CSVQUOTE] == -1} {
+            if {$::CSVQUOTE ni $valid_options} {
                 error "CSVQUOTE must be one of: auto, always"
             }
         }
