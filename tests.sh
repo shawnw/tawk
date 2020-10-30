@@ -619,6 +619,15 @@ else
     fail+=1
 fi
 
+# Test missing input file
+if output=$(./tawk 'BEGIN {}' nosuchfile.txt 2>&1) && [[ -n $output ]]; then
+    echo "Test 55: Pass"
+    pass+=1
+else
+    echo "Test 55: Fail"
+    fail+=1
+fi
+
 #### End of tests
 
 echo "Done."

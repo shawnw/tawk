@@ -38,7 +38,7 @@ package require csv
 # X.Y.Z - Increment X for things that break backwards compatibility,
 # Y for new features, Z for bug fixes.
 
-set version 0.12.1
+set version 0.12.2
 
 set commands [dict create]
 
@@ -370,7 +370,14 @@ proc tawk {i files gets splitter} {
             interp eval $i [list set $varname $varval]
             continue
         }
+
         incr nfiles_processed
+
+        if {![::file exists $file]} {
+            puts stderr "Input file '$file' does not exist; skipping."
+            continue
+        }
+
         process_file $i $file $gets $splitter
     }
     # Read from standard input if no files given on command line
