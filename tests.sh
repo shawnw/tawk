@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 set +o noclobber
-trap "rm -f data*.txt data*.csv test.tawk out*.txt" EXIT
+trap "rm -f data*.txt data*.csv test*.tawk out*.txt" EXIT
 
 echo "Running tawk tests..."
 
@@ -9,7 +9,7 @@ declare -a letters=(a b c d)
 paste <(printf "%s\n" "${letters[@]}") <(seq 1 ${#letters[@]}) > data.txt
 sed 's/\t/,/g' data.txt > data.csv
 
-cat <<'EOF' >test.tawk
+cat <<'EOF' >test1.tawk
 line { incr total $F(2) }
 END { puts $total }
 EOF
@@ -30,7 +30,7 @@ else
 fi
 
 # Read from standard input, script in file
-if output=$(./tawk -f test.tawk < data.txt) && [[ $output -eq 10 ]]; then
+if output=$(./tawk -f test1.tawk < data.txt) && [[ $output -eq 10 ]]; then
     echo "Test 2: Pass"
     pass+=1
 else
@@ -142,7 +142,7 @@ else
 fi
 
 # Safe mode with error
-cat <<'EOF' >test.tawk
+cat <<'EOF' >test2.tawk
 BEGIN {
       set FS ,
       set f [open "out.txt" w]
@@ -150,7 +150,7 @@ BEGIN {
 line { puts $f $F(1) }
 END { close $f }
 EOF
-if ! output=$(./tawk -safe -f test.tawk data.csv 2>&1) \
+if ! output=$(./tawk -safe -f test2.tawk data.csv 2>&1) \
         && [[ $output == Error* ]]; then
     echo "Test 13: Pass"
     pass+=1
@@ -159,7 +159,7 @@ else
     fail+=1
 fi
 
-if ./tawk -f test.tawk data.csv && cmp out.txt <(printf "%s\n" "${letters[@]}"); then
+if ./tawk -f test2.tawk data.csv && cmp out.txt <(printf "%s\n" "${letters[@]}"); then
     echo "Test 14: Pass"
     pass+=1
 else
@@ -598,6 +598,15 @@ if ./tawk 'BEGIN { set FS ";;" }' data4.csv 2>/dev/null; then
     pass+=1
 else
     echo "Test 52: Fail"
+    fail+=1
+fi
+
+# Test regular expression for FS
+if output=$(./tawk -F '[,]' -f test1.tawk data.csv) && [[ $output -eq 10 ]]; then
+    echo "Test 53: Pass"
+    pass+=1
+else
+    echo "Test 53: Fail"
     fail+=1
 fi
 
