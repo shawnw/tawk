@@ -38,7 +38,7 @@ package require csv
 # X.Y.Z - Increment X for things that break backwards compatibility,
 # Y for new features, Z for bug fixes.
 
-set version 0.12.2
+set version 0.12.3
 
 set commands [dict create]
 
@@ -491,7 +491,12 @@ proc main {argv} {
             set csv_mode true
             set gets_cmd gets_csv
             set splitter_cmd split_csv
+            if {[string length $params(quotechar)] != 1} {
+                error "-quotechar argument must be a single character."
+            }
             interp eval $i [list set ::CSVQUOTECHAR $params(quotechar)]
+            interp eval $i {trace add variable ::CSVQUOTECHAR write \
+                                ::internal::trace_single_char_var}
             if {[info exists params(quoteall)] && $params(quoteall)} {
                 interp eval $i {set ::CSVQUOTE always}
             } else {
@@ -508,11 +513,11 @@ proc main {argv} {
                                 ::internal::trace_single_char_var}
             interp eval $i {
                 proc print args {
-                if {[llength $args] == 0} {
-                    puts $::F(0)
-                } else {
-                    puts [csv_join $args $::OFS $::CSVQUOTECHAR $::CSVQUOTE]
-                }
+                    if {[llength $args] == 0} {
+                        puts $::F(0)
+                    } else {
+                        puts [csv_join $args $::OFS $::CSVQUOTECHAR $::CSVQUOTE]
+                    }
             }}
             interp hide $i gets
             interp alias $i gets {} gets_csv
@@ -523,12 +528,13 @@ proc main {argv} {
             set splitter_cmd split_re
             interp eval $i {set ::CSV 0}
             interp eval $i {set ::OFS " "}
-            interp eval $i {proc print args {
-                if {[llength $args] == 0} {
-                    puts $::F(0)
-                } else {
-                    puts [join $args $::OFS]
-                }
+            interp eval $i {
+                proc print args {
+                    if {[llength $args] == 0} {
+                        puts $::F(0)
+                    } else {
+                        puts [join $args $::OFS]
+                    }
             }}
             interp alias $i ::internal::split_line {} split_re
         }

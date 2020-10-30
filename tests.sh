@@ -628,6 +628,24 @@ else
     fail+=1
 fi
 
+# Test failure of multi-char quote char in CSV mode
+if ! ./tawk -csv -quotechar xx 'BEGIN {}' data.csv 2>/dev/null; then
+    echo "Test 56: Pass"
+    pass+=1
+else
+    echo "Test 56: Fail"
+    fail+=1
+fi
+
+# Test failure setting CSVQUOTECHAR to multiple characters
+if ! ./tawk -csv 'BEGIN { set CSVQUOTECHAR xx }' data.csv 2>/dev/null; then
+    echo "Test 57: Pass"
+    pass+=1
+else
+    echo "Test 57: Fail"
+    fail+=1
+fi
+
 #### End of tests
 
 echo "Done."
