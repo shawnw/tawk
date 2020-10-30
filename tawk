@@ -38,7 +38,7 @@ package require csv
 # X.Y.Z - Increment X for things that break backwards compatibility,
 # Y for new features, Z for bug fixes.
 
-set version 0.12.5
+set version 0.12.6
 
 set commands [dict create]
 
@@ -501,6 +501,9 @@ proc main {argv} {
                 [expr {[clock seconds] + $params(timeout)}]
         }
         if {$params(F) ne "whitespace"} {
+            if {$params(csv) && [string length $params(F)] != 1} {
+                error "-F argument can only be a single character in CSV mode."
+            }
             interp eval $i [list set ::FS $params(F)]
         }
         if {$params(csv)} {

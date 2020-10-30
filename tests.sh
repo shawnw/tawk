@@ -646,6 +646,15 @@ else
     fail+=1
 fi
 
+# Test CSV mode multi-char -F error
+if ! ./tawk -csv -F xx 'BEGIN {}' data.csv 2>/dev/null; then
+    echo "Test 58: Pass"
+    pass+=1
+else
+    echo "Test 58: Fail"
+    fail+=1
+fi
+
 #### End of tests
 
 echo "Done."
