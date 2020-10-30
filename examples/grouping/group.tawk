@@ -3,7 +3,7 @@ line {
 }
 
 END {
-    dict for {group total} $groups {
+    dict for {group total} [lsort -stride 2 $groups] {
          print {*}$group $total
     }
 }

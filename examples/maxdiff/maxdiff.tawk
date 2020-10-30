@@ -1,4 +1,5 @@
 #!/usr/bin/env tawk -f
+# -*- tcl -*-
 line {$F(1) > -1000 && $F(2) > -1000} {
     set d [expr {$F(1) - $F(2)}]
     if {[info exists diffs($FNR)]} {
