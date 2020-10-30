@@ -88,15 +88,17 @@ Most of these are lifted straight from `awk` names.
   to indicate field delimiters. If a a single space, or not set, any
   amount of whitespace is used, and leading and trailing whitespace is
   first stripped. If an empty string, splits every character into its
-  own field.
+  own field. Can only be a single character in CSV mode.
 * `OFS` Used to separate fields in `F(0)` when other elements of `F`
-  are written to or `NF` is changed.
+  are written to or `NF` is changed. Also used to seperate arguments
+  of `print`. Can only be a single character in CSV mode.
 * `CSV` 1 if in CSV mode, 0 if in normal mode. (Read-only)
 * `CSVQUOTECHAR` when in CSV mode, the character used to quote
-  fields. Set by the `-quotechar` option.
+  fields. Set by the `-quotechar` option. Defaults to a double quote.
 * `CSVQUOTE` Set to `always` to always quote CSV fields (Turned on by
   the `-quoteall` argument), or `auto` to only quote when
-  needed. Attempting to set other values raises an error.
+  needed. Attempting to set other values raises an error. Defaults to
+  auto.
 
 CSV Mode
 --------
