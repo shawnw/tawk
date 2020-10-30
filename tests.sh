@@ -655,6 +655,19 @@ else
     fail+=1
 fi
 
+# Test a different quote char for input
+cat >data5.csv <<EOF
+1,^a, quoted, field^,3
+EOF
+if output=$(./tawk -csv -quotechar "^" 'line { puts $NF }' data5.csv) && \
+        [[ $output -eq 3 ]]; then
+    echo "Test 59: Pass"
+    pass+=1
+else
+    echo "Test 59: Fail"
+    fail+=1
+fi
+
 #### End of tests
 
 echo "Done."

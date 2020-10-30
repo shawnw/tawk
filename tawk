@@ -38,7 +38,7 @@ package require csv
 # X.Y.Z - Increment X for things that break backwards compatibility,
 # Y for new features, Z for bug fixes.
 
-set version 0.12.6
+set version 0.13.0
 
 set commands [dict create]
 
@@ -328,7 +328,11 @@ proc process_file {i filename gets splitter} {
             } else {
                 set fs whitespace
             }
-            set fields [$splitter $line $fs]
+            set split_args [list $line $fs]
+            if {[interp eval $i {set ::CSV}]} {
+                lappend split_args [interp eval $i {set ::CSVQUOTECHAR}]
+            }
+            set fields [$splitter {*}$split_args]
             interp eval $i [list set ::NF [llength $fields]]
             interp eval $i [list set ::F(0) $line]
             interp eval $i [list array set ::F [numberlist $fields]]
