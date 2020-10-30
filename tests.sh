@@ -610,6 +610,15 @@ else
     fail+=1
 fi
 
+# Test missing souce file
+if ! ./tawk -f nosuchfile.tawk data.csv 2>/dev/null; then
+    echo "Test 54: Pass"
+    pass+=1
+else
+    echo "Test 54: Fail"
+    fail+=1
+fi
+
 #### End of tests
 
 echo "Done."

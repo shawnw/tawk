@@ -38,7 +38,7 @@ package require csv
 # X.Y.Z - Increment X for things that break backwards compatibility,
 # Y for new features, Z for bug fixes.
 
-set version 0.12.0
+set version 0.12.1
 
 set commands [dict create]
 
@@ -463,6 +463,9 @@ proc main {argv} {
             interp eval $i [list set ::FS $params(F)]
         }
         if {$params(f) ne ""} {
+            if {![file exists $params(f)]} {
+                error "File '$params(f)' does not exist."
+            }
             if {[interp issafe $i]} {
                 interp invokehidden $i source $params(f)
             } else {
